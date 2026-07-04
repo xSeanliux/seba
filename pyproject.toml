@@ -1,0 +1,26 @@
+[project]
+name = "seba"
+version = "0.1.0"
+description = "seba — a long-term personal tutor in the terminal"
+readme = "README.md"
+authors = [
+    { name = "Sean Liu", email = "zhxnliu@yahoo.com.tw" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.116.0",
+    "fsrs>=6.3.1",
+    "pydantic>=2",
+    "pyyaml>=6.0.3",
+    "rich>=15.0.0",
+    "typer>=0.26.8",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.14,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
