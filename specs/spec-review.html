@@ -1,4 +1,4 @@
-<title>Tutor — Design Spec Review</title>
+<title>Seba — Design Spec Review</title>
 <style>
   :root {
     --bg: #FAF9F5; --bg2: #F1EFE8; --ink: #20242B; --ink2: #5A5F6B;
@@ -118,7 +118,7 @@
 </style>
 
 <header class="top">
-  <h1>Tutor — Design Spec Review</h1>
+  <h1>Seba 𓇼 — Design Spec Review</h1>
   <span class="sub" id="noteCount"></span>
   <button id="exportBtn" type="button">Copy feedback as Markdown</button>
 </header>
@@ -129,7 +129,7 @@
 
 <section class="spec" data-sec="Overview" id="s-overview">
   <div class="sec-head"><h2>1 · What this is</h2></div>
-  <p>A long-term personal tutor that runs in the terminal. You converse with it daily; it teaches through guided dialogue and practice questions. Unlike chat "learning modes", it owns a <strong>curriculum</strong> (concept graph synthesized from a textbook ToC + web research) and a <strong>longitudinal learner state</strong> (known / shaky / due), both plain text in git. Session 40 provably knows what happened in session 1.</p>
+  <p><strong>Seba</strong> (Egyptian <em>sbꜣ</em>, "to teach" — root of <em>sbꜣyt</em>, the instruction-literature genre; the glyph 𓇼 also writes "star" and "door") is a long-term personal tutor that runs in the terminal. You converse with it daily; it teaches through guided dialogue and practice questions. Unlike chat "learning modes", it owns a <strong>curriculum</strong> (concept graph synthesized from a textbook ToC + web research) and a <strong>longitudinal learner state</strong> (known / shaky / due), both plain text in git. Session 40 provably knows what happened in session 1.</p>
   <p>First two subjects, built simultaneously to force honest abstraction: <strong>Probability</strong> (concept-heavy, teach-heavy) and <strong>Italian</strong> (item-heavy, review-heavy).</p>
   <p><strong>Out of scope:</strong> learning feed, e-ink, Telegram, web UI, full PDF ingestion. Future satellites attach at the plain-text state seam.</p>
 </section>
@@ -146,16 +146,16 @@
     <li><strong>Agenda</strong> (code → LLM): what this session covers, scheduler-computed.</li>
     <li><strong>Outcome tools</strong> (LLM → code): the tutor records what happens <em>during</em> the session via validated tool calls — <code>grade_review</code>, <code>mint_item</code>, <code>update_concept</code>, <code>end_session</code>. Each call schema-checked the moment it's made (bad args → immediate in-flow retry); grades land while the exchange is fresh; a crash loses nothing already recorded.</li>
   </ol>
-  <p>A transcript-level extraction pass survives only as crash recovery (<code>tutor extract</code>) for sessions that die before <code>end_session</code>.</p>
+  <p>A transcript-level extraction pass survives only as crash recovery (<code>seba extract</code>) for sessions that die before <code>end_session</code>.</p>
   <div class="callout">The LLM never edits state files — tools are code functions applying validated updates. Code never generates prose. Every module is testable without an LLM by injecting synthetic artifacts at this seam.</div>
 </section>
 
 <section class="spec" data-sec="Repository layout" id="s-repo">
   <div class="sec-head"><h2>3 · Repository layout</h2></div>
-<pre><code>tutor/
+<pre><code>seba/
 ├── pyproject.toml            # uv; deps: anthropic, py-fsrs, pydantic, rich, pyyaml, typer
-├── src/tutor/
-│   ├── cli.py                # tutor · tutor new-goal · tutor status
+├── src/seba/
+│   ├── cli.py                # seba · seba new-goal · seba status
 │   ├── config.py             # paths, model ids, subject presets (v0)
 │   ├── models.py             # ALL pydantic schemas — single source of truth
 │   ├── store/                # M1  state persistence (only module touching data/)
@@ -178,7 +178,7 @@
   <ul>
     <li>Imports strictly downward: <code>ui → session → scheduler → store</code>; no cycles.</li>
     <li>Prompts are markdown files with <code>{placeholder}</code> substitution.</li>
-    <li><code>data/</code> location via <code>TUTOR_DATA_DIR</code>; store git-commits after every session.</li>
+    <li><code>data/</code> location via <code>SEBA_DATA_DIR</code>; store git-commits after every session.</li>
   </ul>
 </section>
 
@@ -240,13 +240,13 @@ end_session(summary, next_session_hint)                 # exactly once, at close
     <tr><td><span class="tag">M3 syllabus</span></td><td><code>load_syllabus · frontier · apply_status</code>.</td><td>Cycle named in error; frontier correct on diamond/chain/disconnected fixtures.</td></tr>
     <tr><td><span class="tag">M4 session</span></td><td><code>run_session(agenda, profile, io)</code> → (SessionRecord, transcript). Tools dispatched in-flow with validation feedback; grading rubric lives in <code>grade_review</code>'s description. <code>recover_session</code> backfills crashed sessions (cheap model). Transcript never fed to future sessions.</td><td>Tool handlers unit-tested (invalid id, over-cap, double end_session); scripted <code>SessionIO</code> + mocked model; 3+ recovery fixtures.</td></tr>
     <tr><td><span class="tag">M5 synthesis</span></td><td>ToC → draft <code>syllabus.yaml</code> → <code>$EDITOR</code> → validate (errors as YAML comments on retry). No matching subject profile → drafts <code>profile.yaml</code> + <code>overlay.md</code> from templates too. v1: agentic + web search, same interface.</td><td>Output always passes validation or the editor loop engages.</td></tr>
-    <tr><td><span class="tag">M6 ui</span></td><td>Thin REPL: goal picker → briefing card → streaming chat → one-line receipt. <code>tutor status</code> table.</td><td>Manual; rich handles resize/streaming.</td></tr>
+    <tr><td><span class="tag">M6 ui</span></td><td>Thin REPL: goal picker → briefing card → streaming chat → one-line receipt. <code>seba status</code> table.</td><td>Manual; rich handles resize/streaming.</td></tr>
   </table></div>
 </section>
 
 <section class="spec" data-sec="Session lifecycle" id="s-lifecycle">
   <div class="sec-head"><h2>7 · Session lifecycle</h2></div>
-<pre><code>tutor
+<pre><code>seba
  └─ load goal → build agenda → briefing card
  └─ run_session:
      1. tutor opens with continuity ("last time…"), poses first due review
@@ -259,7 +259,7 @@ end_session(summary, next_session_hint)                 # exactly once, at close
  └─ scheduler finalizes FSRS state; syllabus statuses applied
  └─ store.save_session(...)           ← one git commit
  └─ receipt: "4 reviewed · 2 minted · conditional-expectation → in-progress"</code></pre>
-  <p><strong>Failure handling:</strong> tool calls are accepted <em>during</em> the session, so a crash loses nothing already recorded — partials saved with an <code>INCOMPLETE</code> marker; <code>tutor extract &lt;goal&gt; &lt;n&gt;</code> backfills anything after the last accepted call. A session's learning is never lost to a parse error.</p>
+  <p><strong>Failure handling:</strong> tool calls are accepted <em>during</em> the session, so a crash loses nothing already recorded — partials saved with an <code>INCOMPLETE</code> marker; <code>seba extract &lt;goal&gt; &lt;n&gt;</code> backfills anything after the last accepted call. A session's learning is never lost to a parse error.</p>
 </section>
 
 <section class="spec" data-sec="Prompts" id="s-prompts">
@@ -275,9 +275,9 @@ end_session(summary, next_session_hint)                 # exactly once, at close
 
 <section class="spec" data-sec="UX" id="s-ux">
   <div class="sec-head"><h2>9 · UX — what the user does</h2></div>
-  <p><strong>Once per goal (~30 min):</strong> <code>tutor new-goal probability --toc blitzstein-toc.md</code> → skim/edit the drafted syllabus in <code>$EDITOR</code>. The only real setup — and it's your curriculum.</p>
-  <p><strong>Every time:</strong> type <code>tutor</code>, pick goal, talk. Quit whenever — extraction and save are automatic. Zero bookkeeping: no self-grading, no card authoring, no marking complete. The conversation is the interface.</p>
-  <p><strong>Sometimes:</strong> <code>tutor status</code>; approve syllabus revision diffs; edit YAML when an estimate feels wrong; drop in a new source file.</p>
+  <p><strong>Once per goal (~30 min):</strong> <code>seba new-goal probability --toc blitzstein-toc.md</code> → skim/edit the drafted syllabus in <code>$EDITOR</code>. The only real setup — and it's your curriculum.</p>
+  <p><strong>Every time:</strong> type <code>seba</code>, pick goal, talk. Quit whenever — extraction and save are automatic. Zero bookkeeping: no self-grading, no card authoring, no marking complete. The conversation is the interface.</p>
+  <p><strong>Sometimes:</strong> <code>seba status</code>; approve syllabus revision diffs; edit YAML when an estimate feels wrong; drop in a new source file.</p>
 </section>
 
 <section class="spec" data-sec="Context budget" id="s-context">
@@ -289,7 +289,7 @@ end_session(summary, next_session_hint)                 # exactly once, at close
     <li><strong>Notes:</strong> <code>notes.md</code> structured per-concept; briefing includes only this session's scope (review items' concepts, teach concept + direct prereqs), ≤3 newest notes each, ~1k-token budget, oldest truncated first.</li>
     <li><strong>Sources:</strong> section-granularity excerpts, ~4k-token budget; over → keep primary, drop rest, note it.</li>
     <li><strong>History:</strong> last session's hint only; transcripts never fed forward.</li>
-    <li><strong>Consolidation (v1):</strong> <code>tutor gc</code> — a concept's notes exceed 5 → cheap-model pass distills them into one.</li>
+    <li><strong>Consolidation (v1):</strong> <code>seba gc</code> — a concept's notes exceed 5 → cheap-model pass distills them into one.</li>
   </ul>
   <div class="callout">Net: session context ≈ system prompt (~2k) + agenda (~1–5k) + live dialogue — independent of months of history or thousands of items.</div>
 </section>
@@ -306,7 +306,7 @@ end_session(summary, next_session_hint)                 # exactly once, at close
   </ol>
   <p>Steps 1–2 and 3 parallelize across agents once <code>models.py</code> is merged; <code>models.py</code> is a single owned artifact, first.</p>
   <h3>Milestone v1 — by observed pain</h3>
-  <p>Concept ladder · <strong><code>tutor drill &lt;goal&gt;</code></strong> — review-only rapid-fire mode (the "dojo"; same agenda machinery, terse overlay — for when Italian's due queue outgrows conversational weaving) · agentic synthesis with web search · pace model from logs · notes consolidation (<code>tutor gc</code>) · <code>tutor extract</code> polish · TUI upgrade (textual).</p>
+  <p>Concept ladder · <strong><code>seba drill &lt;goal&gt;</code></strong> — review-only rapid-fire mode (the "dojo"; same agenda machinery, terse overlay — for when Italian's due queue outgrows conversational weaving) · agentic synthesis with web search · pace model from logs · notes consolidation (<code>seba gc</code>) · <code>seba extract</code> polish · TUI upgrade (textual).</p>
 </section>
 
 <section class="spec" data-sec="Testing and risks" id="s-risks">
@@ -393,7 +393,7 @@ end_session(summary, next_session_hint)                 # exactly once, at close
   updateCount();
 
   document.getElementById('exportBtn').addEventListener('click', async () => {
-    const parts = ['# Feedback on Tutor design spec', ''];
+    const parts = ['# Feedback on Seba design spec', ''];
     let any = false;
     secs.forEach(sec => {
       const name = sec.dataset.sec;
