@@ -91,8 +91,12 @@ def _dispatch(goal: str, tool: str, args: dict) -> None:
 def _finish(store: Store, goal: str, pending: PendingSession, ppath) -> None:
     state = store.load_goal(goal)
     updated = apply_record(state, pending.record, datetime.now(timezone.utc))
-    clear_pending(ppath)
+    # Save durably BEFORE clearing pending: a crash inside save_session (file
+    # writes + git) must never leave the session lost with the pending gone.
+    # ponytail: narrow double-apply window if a crash lands between save and
+    # clear; a start-side idempotency guard is deferred to the T6 dogfood.
     store.save_session(goal, pending.record, NO_TRANSCRIPT, updated)
+    clear_pending(ppath)
     repl.receipt(pending.record)
 
 
