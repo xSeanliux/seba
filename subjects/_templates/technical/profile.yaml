@@ -1,0 +1,5 @@
+name: TEMPLATE
+kind: technical
+max_reviews_per_session: 6
+item_types: [recall, apply]
+session_shape: teach-heavy

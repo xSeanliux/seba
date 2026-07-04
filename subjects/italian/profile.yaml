@@ -1,0 +1,5 @@
+name: italian
+kind: language
+max_reviews_per_session: 20
+item_types: [recognize, produce, cloze]
+session_shape: review-heavy
