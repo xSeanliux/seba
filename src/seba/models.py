@@ -126,3 +126,10 @@ class GoalSummary(BaseModel):
     subject: str
     session_count: int
     due_count: int
+
+
+class PendingSession(BaseModel):
+    goal: str
+    agenda: Agenda
+    record: SessionRecord = Field(default_factory=SessionRecord)
+    started: date
