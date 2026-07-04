@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time, timezone
 from uuid import uuid4
 
 from fsrs import Card, Rating, Scheduler
@@ -27,5 +27,10 @@ def apply_review(item: Item, grade: Grade, now: datetime) -> Item:
 
 
 def mint_item(new: MintItem, today: date) -> Item:
+    # py-fsrs stamps a new Card.due from the wall clock; override it to `today`
+    # so scheduling stays deterministic in the passed date (spec §M2) and a
+    # freshly minted card is due the day it is created.
+    fsrs = Card().to_dict()
+    fsrs["due"] = datetime.combine(today, time.min, tzinfo=timezone.utc).isoformat()
     return Item(id=f"it-{uuid4().hex[:8]}", concept=new.concept, type=new.type,
-                front=new.front, back=new.back, fsrs=Card().to_dict(), created=today)
+                front=new.front, back=new.back, fsrs=fsrs, created=today)
