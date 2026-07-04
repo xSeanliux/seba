@@ -13,13 +13,6 @@ def test_data_dir_default(monkeypatch):
     assert config.data_dir() == Path.home() / "seba-data"
 
 
-def test_models_defaults(monkeypatch):
-    monkeypatch.delenv("SEBA_MODEL", raising=False)
-    assert config.model() == "claude-sonnet-5"
-    monkeypatch.setenv("SEBA_RECOVERY_MODEL", "claude-x")
-    assert config.recovery_model() == "claude-x"
-
-
 def test_subjects_dirs(monkeypatch, tmp_path):
     monkeypatch.setenv("SEBA_DATA_DIR", str(tmp_path))
     dirs = config.subjects_dirs()

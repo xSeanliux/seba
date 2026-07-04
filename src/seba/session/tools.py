@@ -16,20 +16,6 @@ TOOL_MODELS: dict[str, type[BaseModel]] = {
 }
 
 
-def anthropic_tools() -> list[dict]:
-    tools = [{"name": name,
-              "description": model.__doc__ or name,
-              "input_schema": model.model_json_schema()}
-             for name, model in TOOL_MODELS.items()]
-    tools.append({"name": "fetch_source",
-                  "description": "Fetch a source excerpt by ref, "
-                                 "e.g. blitzstein/ch09.md#9.2",
-                  "input_schema": {"type": "object",
-                                   "properties": {"ref": {"type": "string"}},
-                                   "required": ["ref"]}})
-    return tools
-
-
 class ToolHandler:
     def __init__(self, agenda: Agenda, syllabus: Syllabus, sources_dir: Path):
         self.agenda = agenda

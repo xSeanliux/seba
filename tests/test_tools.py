@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 from seba.models import Agenda, Concept, ReviewItem, Syllabus
-from seba.session.tools import ToolHandler, anthropic_tools
+from seba.session.tools import ToolHandler
 
 
 @pytest.fixture
@@ -14,14 +14,6 @@ def handler(tmp_path: Path):
     syllabus = Syllabus(goal="g", subject="probability",
                         concepts=[Concept(id="bayes", name="Bayes")])
     return ToolHandler(agenda, syllabus, tmp_path)
-
-
-def test_anthropic_tools_shape():
-    tools = anthropic_tools()
-    names = {t["name"] for t in tools}
-    assert names == {"grade_review", "mint_item", "update_concept",
-                     "end_session", "fetch_source"}
-    assert all("input_schema" in t and t["description"] for t in tools)
 
 
 def test_grade_review_ok_and_duplicate(handler):

@@ -1,25 +1,9 @@
 from rich.console import Console
-from rich.markdown import Markdown
 from rich.panel import Panel
 
 from seba.models import Agenda, SessionRecord
 
 console = Console()
-
-
-class TerminalIO:
-    def get_input(self) -> str | None:
-        try:
-            text = console.input("[bold cyan]you>[/] ")
-        except EOFError:
-            return None
-        return text or None
-
-    def show_chunk(self, text: str) -> None:
-        console.print(Markdown(text))
-
-    def show(self, text: str) -> None:
-        console.print(text)
 
 
 def briefing_card(agenda: Agenda) -> None:
