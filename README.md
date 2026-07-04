@@ -78,3 +78,53 @@ recorded — nothing lives only in the conversation. If the session (or Claude
 Code, or the machine) dies mid-session, `seba start GOAL` resumes exactly
 where it left off; `seba abandon GOAL` closes it out as INCOMPLETE instead.
 There is no `extract`/replay step anymore — there is nothing to reconstruct.
+
+## Development
+
+### Architecture
+
+The Python half is deterministic and stateless: each `seba` subcommand is a
+one-shot invocation that reads and writes plain-text state on disk, sharing a
+durable `session.pending.yaml` between calls. There is no long-running
+process. The pieces:
+
+- `build_agenda` — the **context firewall**: turns durable learner state into
+  the single agenda the tutor sees (what's due, what to teach). It is the only
+  thing that decides *what* a session covers.
+- `ToolHandler` — the **one validator**: every outcome (grade, mint, concept
+  update, end-gate) is validated here and nowhere else. One code path, one
+  error format.
+- `apply_record` — folds an accepted session record into learner state (FSRS
+  scheduling + syllabus progress).
+- `save_session` — writes the session files and makes one git commit in the
+  data repo.
+
+Claude Code is the LLM half — dialogue and grading — and reaches the
+deterministic half only through the CLI, directed by the `seba-tutor` skill.
+
+### Invariants (don't break these)
+
+- **All schemas live in `src/seba/models.py`.** No module defines its own dict
+  shapes; pass models, not loose dicts.
+- **Imports run strictly downward:** `cli → session → scheduler → store`;
+  `syllabus` is a sibling used by `cli`/`store`. No circular imports.
+- **`ToolHandler` owns all outcome validation.** Never add a second validator
+  or default silently. Grades are `again | hard | good | easy | skipped`;
+  concept status moves `unseen → in-progress → done` one step forward only;
+  `mint_item` is capped at 10 per session.
+- **Fail loudly.** A malformed state file raises an error naming the file; a
+  CLI validation failure prints the reason to stderr and exits non-zero.
+  Never swallow an error or silently default.
+- **The core is offline and deterministic.** No network, no API key — tests
+  run with neither.
+
+### Running and testing
+
+```bash
+uv run pytest -q          # full suite (must be green before every commit)
+uv run seba --help        # exercise the CLI directly
+```
+
+Dependencies (exact): `fsrs`, `pydantic>=2`, `rich`, `pyyaml`, `typer`; dev:
+`pytest`. Add nothing else without reason. Commit after every green test cycle
+with a conventional-commit subject.
