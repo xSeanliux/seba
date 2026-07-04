@@ -1,17 +1,17 @@
 from datetime import datetime
 
-from seba.models import GoalState, SessionRecord
+from seba.models import GoalState, SessionRecord, Status
 from seba.scheduler.items import apply_review, mint_item
 from seba.syllabus.graph import SyllabusError, apply_status
 
-_STATUS = {"started": "in-progress", "completed": "done"}
+_STATUS: dict[str, Status] = {"started": "in-progress", "completed": "done"}
 
 
-def apply_record(state: GoalState, record: SessionRecord,
-                 now: datetime) -> GoalState:
+def apply_record(state: GoalState, record: SessionRecord, now: datetime) -> GoalState:
     grades = {r.id: r.grade for r in record.reviews}
-    items = [apply_review(i, grades[i.id], now) if i.id in grades else i
-             for i in state.items]
+    items = [
+        apply_review(i, grades[i.id], now) if i.id in grades else i for i in state.items
+    ]
     items += [mint_item(m, now.date()) for m in record.new_items]
 
     syllabus = state.syllabus

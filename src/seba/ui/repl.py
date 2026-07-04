@@ -8,10 +8,13 @@ console = Console()
 
 def briefing_card(agenda: Agenda) -> None:
     teach = agenda.teach_concept.name if agenda.teach_concept else "review only"
-    console.print(Panel(
-        f"{agenda.goal} · session {agenda.session_number} · "
-        f"{len(agenda.review_items)} due · today: {teach}\n\n{agenda.briefing}",
-        title="tutor"))
+    console.print(
+        Panel(
+            f"{agenda.goal} · session {agenda.session_number} · "
+            f"{len(agenda.review_items)} due · today: {teach}\n\n{agenda.briefing}",
+            title="tutor",
+        )
+    )
 
 
 def receipt(record: SessionRecord) -> None:
@@ -21,7 +24,6 @@ def receipt(record: SessionRecord) -> None:
     if skipped:
         parts.append(f"{skipped} skipped")
     parts.append(f"{len(record.new_items)} minted")
-    parts += [f"{c.id} → {c.status_change}" for c in record.concepts
-              if c.status_change]
+    parts += [f"{c.id} → {c.status_change}" for c in record.concepts if c.status_change]
     status = "" if record.complete else "  [red]INCOMPLETE[/]"
     console.print("[dim]" + " · ".join(parts) + "[/]" + status)

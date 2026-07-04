@@ -25,8 +25,11 @@ def load_pending(path: Path) -> PendingSession | None:
 
 def save_pending(path: Path, pending: PendingSession) -> None:
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(yaml.safe_dump(pending.model_dump(mode="json"), sort_keys=False,
-                                  allow_unicode=True))
+    tmp.write_text(
+        yaml.safe_dump(
+            pending.model_dump(mode="json"), sort_keys=False, allow_unicode=True
+        )
+    )
     tmp.rename(path)
 
 

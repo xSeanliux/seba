@@ -66,6 +66,7 @@ class GradeReview(BaseModel):
     Rubric: wrong or no recall -> again; correct with significant
     hesitation or hints -> hard; correct -> good; instant and
     confident -> easy; never reached this session -> skipped."""
+
     id: str
     grade: Grade
     note: str | None = None
@@ -74,6 +75,7 @@ class GradeReview(BaseModel):
 class MintItem(BaseModel):
     """Create a spaced-repetition card. Only for facts/skills worth
     retaining a month from now — not session-local scaffolding."""
+
     concept: str
     type: ItemType
     front: str
@@ -82,6 +84,7 @@ class MintItem(BaseModel):
 
 class UpdateConcept(BaseModel):
     """Record concept progress or a note (misconception, strength)."""
+
     id: str
     status_change: Literal["started", "completed"] | None = None
     note: str | None = None
@@ -89,6 +92,7 @@ class UpdateConcept(BaseModel):
 
 class EndSession(BaseModel):
     """Close the session. Call exactly once, after recapping aloud."""
+
     summary: str
     next_session_hint: str
 

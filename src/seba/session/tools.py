@@ -2,8 +2,15 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
-from seba.models import (Agenda, EndSession, GradeReview, MintItem,
-                         SessionRecord, Syllabus, UpdateConcept)
+from seba.models import (
+    Agenda,
+    EndSession,
+    GradeReview,
+    MintItem,
+    SessionRecord,
+    Syllabus,
+    UpdateConcept,
+)
 from seba.scheduler.agenda import resolve_excerpt
 
 MINT_CAP = 10
@@ -67,9 +74,11 @@ class ToolHandler:
             return "session already ended", True
         missing = self.missing_grades()
         if missing:
-            return ("cannot end: ungraded review items: "
-                    + ", ".join(missing)
-                    + ". Grade each (or grade as 'skipped') first."), True
+            return (
+                "cannot end: ungraded review items: "
+                + ", ".join(missing)
+                + ". Grade each (or grade as 'skipped') first."
+            ), True
         self.record.summary = call.summary
         self.record.next_session_hint = call.next_session_hint
         self.record.complete = True

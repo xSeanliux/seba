@@ -6,7 +6,9 @@ from seba.store.store import Store
 
 runner = CliRunner()
 
-SYLLABUS = "goal: prob\nsubject: probability\nconcepts:\n  - id: bayes\n    name: Bayes\n"
+SYLLABUS = (
+    "goal: prob\nsubject: probability\nconcepts:\n  - id: bayes\n    name: Bayes\n"
+)
 
 
 def invoke_ok(args):
@@ -23,14 +25,43 @@ def test_session_two_reflects_session_one(monkeypatch, tmp_path):
 
     # --- Session 1: teach, note a misconception, mint a card, end.
     out1 = yaml.safe_load(invoke_ok(["start", "prob"]).output)
-    assert out1["ungraded_reviews"] == []          # nothing due on day one
+    assert out1["ungraded_reviews"] == []  # nothing due on day one
     assert out1["agenda"]["teach_concept"]["id"] == "bayes"
-    invoke_ok(["concept", "prob", "bayes", "--status", "started",
-               "--note", "confuses prior with likelihood"])
-    invoke_ok(["mint", "prob", "--concept", "bayes", "--type", "recall",
-               "--front", "State Bayes' theorem", "--back", "P(A|B)=..."])
-    invoke_ok(["end", "prob", "--summary", "Introduced Bayes.",
-               "--hint", "drill the prior/likelihood split"])
+    invoke_ok(
+        [
+            "concept",
+            "prob",
+            "bayes",
+            "--status",
+            "started",
+            "--note",
+            "confuses prior with likelihood",
+        ]
+    )
+    invoke_ok(
+        [
+            "mint",
+            "prob",
+            "--concept",
+            "bayes",
+            "--type",
+            "recall",
+            "--front",
+            "State Bayes' theorem",
+            "--back",
+            "P(A|B)=...",
+        ]
+    )
+    invoke_ok(
+        [
+            "end",
+            "prob",
+            "--summary",
+            "Introduced Bayes.",
+            "--hint",
+            "drill the prior/likelihood split",
+        ]
+    )
 
     # --- Session 2: the minted card is due; briefing carries note + hint.
     out2 = yaml.safe_load(invoke_ok(["start", "prob"]).output)

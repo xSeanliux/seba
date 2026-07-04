@@ -20,17 +20,32 @@ def _fsrs(due="2020-01-01T00:00:00+00:00"):
 def seed(data_dir, with_item=True):
     """Create goal 'prob'; optionally seed one long-overdue item."""
     store = Store(data_dir)
-    store.create_goal("prob", Syllabus(goal="prob", subject="probability",
-                                       concepts=[Concept(id="bayes", name="Bayes")]),
-                      "probability")
+    store.create_goal(
+        "prob",
+        Syllabus(
+            goal="prob",
+            subject="probability",
+            concepts=[Concept(id="bayes", name="Bayes")],
+        ),
+        "probability",
+    )
     if with_item:
         gs = store.load_goal("prob")
-        item = Item(id="it-1", concept="bayes", type="recall",
-                    front="State Bayes", back="P(A|B)=...",
-                    fsrs=_fsrs(), created=date(2026, 1, 1))
-        store.save_session("prob", SessionRecord(complete=True, summary="seed",
-                                                 next_session_hint="seed"),
-                           "t", gs.model_copy(update={"items": [item]}))
+        item = Item(
+            id="it-1",
+            concept="bayes",
+            type="recall",
+            front="State Bayes",
+            back="P(A|B)=...",
+            fsrs=_fsrs(),
+            created=date(2026, 1, 1),
+        )
+        store.save_session(
+            "prob",
+            SessionRecord(complete=True, summary="seed", next_session_hint="seed"),
+            "t",
+            gs.model_copy(update={"items": [item]}),
+        )
     return store
 
 
@@ -75,11 +90,23 @@ def test_grade_records_and_rejects_duplicates_and_unknowns(monkeypatch, tmp_path
 def test_commands_without_pending_fail_with_hint(monkeypatch, tmp_path):
     data = env(monkeypatch, tmp_path)
     seed(data)
-    for args in (["grade", "prob", "it-1", "good"],
-                 ["mint", "prob", "--concept", "bayes", "--type", "recall",
-                  "--front", "f", "--back", "b"],
-                 ["concept", "prob", "bayes", "--note", "n"],
-                 ["end", "prob", "--summary", "s", "--hint", "h"]):
+    for args in (
+        ["grade", "prob", "it-1", "good"],
+        [
+            "mint",
+            "prob",
+            "--concept",
+            "bayes",
+            "--type",
+            "recall",
+            "--front",
+            "f",
+            "--back",
+            "b",
+        ],
+        ["concept", "prob", "bayes", "--note", "n"],
+        ["end", "prob", "--summary", "s", "--hint", "h"],
+    ):
         result = runner.invoke(app, args)
         assert result.exit_code == 1
         assert "seba start" in (result.output + str(result.exception or ""))
@@ -90,15 +117,41 @@ def test_end_gate_then_success(monkeypatch, tmp_path):
     store = seed(data)
     runner.invoke(app, ["start", "prob"])
     blocked = runner.invoke(app, ["end", "prob", "--summary", "s", "--hint", "h"])
-    assert blocked.exit_code == 1 and "it-1" in (blocked.output + str(blocked.exception or ""))
+    assert blocked.exit_code == 1 and "it-1" in (
+        blocked.output + str(blocked.exception or "")
+    )
 
     runner.invoke(app, ["grade", "prob", "it-1", "good"])
-    runner.invoke(app, ["mint", "prob", "--concept", "bayes", "--type", "recall",
-                        "--front", "nf", "--back", "nb"])
-    runner.invoke(app, ["concept", "prob", "bayes", "--status", "started",
-                        "--note", "shaky on priors"])
-    done = runner.invoke(app, ["end", "prob", "--summary", "Reviewed Bayes.",
-                               "--hint", "drill priors"])
+    runner.invoke(
+        app,
+        [
+            "mint",
+            "prob",
+            "--concept",
+            "bayes",
+            "--type",
+            "recall",
+            "--front",
+            "nf",
+            "--back",
+            "nb",
+        ],
+    )
+    runner.invoke(
+        app,
+        [
+            "concept",
+            "prob",
+            "bayes",
+            "--status",
+            "started",
+            "--note",
+            "shaky on priors",
+        ],
+    )
+    done = runner.invoke(
+        app, ["end", "prob", "--summary", "Reviewed Bayes.", "--hint", "drill priors"]
+    )
     assert done.exit_code == 0
 
     assert not (data / "goals" / "prob" / "session.pending.yaml").exists()

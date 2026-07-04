@@ -1,7 +1,13 @@
 from pathlib import Path
 import pytest
 from seba.models import Concept, Syllabus
-from seba.syllabus.graph import SyllabusError, apply_status, frontier, load_syllabus, validate
+from seba.syllabus.graph import (
+    SyllabusError,
+    apply_status,
+    frontier,
+    load_syllabus,
+    validate,
+)
 
 
 def make(concepts):
@@ -9,8 +15,12 @@ def make(concepts):
 
 
 def test_cycle_detected_and_named():
-    s = make([Concept(id="a", name="A", prereqs=["b"]),
-              Concept(id="b", name="B", prereqs=["a"])])
+    s = make(
+        [
+            Concept(id="a", name="A", prereqs=["b"]),
+            Concept(id="b", name="B", prereqs=["a"]),
+        ]
+    )
     with pytest.raises(SyllabusError, match="a"):
         validate(s)
 
@@ -28,10 +38,14 @@ def test_duplicate_id_rejected():
 
 
 def test_frontier_diamond():
-    s = make([Concept(id="a", name="A", status="done"),
-              Concept(id="b", name="B", prereqs=["a"]),
-              Concept(id="c", name="C", prereqs=["a"]),
-              Concept(id="d", name="D", prereqs=["b", "c"])])
+    s = make(
+        [
+            Concept(id="a", name="A", status="done"),
+            Concept(id="b", name="B", prereqs=["a"]),
+            Concept(id="c", name="C", prereqs=["a"]),
+            Concept(id="d", name="D", prereqs=["b", "c"]),
+        ]
+    )
     assert [c.id for c in frontier(s)] == ["b", "c"]
 
 

@@ -9,8 +9,7 @@ from seba.models import PendingSession, SubjectProfile
 from seba.scheduler.agenda import build_agenda
 from seba.scheduler.apply import apply_record
 from seba.session.loader import load_overlay, load_profile
-from seba.session.pending import (clear_pending, load_pending, pending_path,
-                                  save_pending)
+from seba.session.pending import clear_pending, load_pending, pending_path, save_pending
 from seba.session.tools import ToolHandler
 from seba.store.store import Store
 from seba.syllabus.graph import SyllabusError, load_syllabus
@@ -26,17 +25,24 @@ def _store() -> Store:
 def _profile(subject: str) -> SubjectProfile:
     p = load_profile(subject)
     if p is None:
-        typer.echo(f"no subject profile '{subject}' — create "
-                   f"{config.data_dir()}/subjects/{subject}/profile.yaml "
-                   f"(copy from subjects/_templates/)", err=True)
+        typer.echo(
+            f"no subject profile '{subject}' — create "
+            f"{config.data_dir()}/subjects/{subject}/profile.yaml "
+            f"(copy from subjects/_templates/)",
+            err=True,
+        )
         raise typer.Exit(1)
     return p
 
 
 @app.command("new-goal")
-def new_goal(name: str, subject: str = typer.Option(...),
-             from_file: Path = typer.Option(..., "--from-file",
-                                            help="syllabus YAML drafted in conversation")):
+def new_goal(
+    name: str,
+    subject: str = typer.Option(...),
+    from_file: Path = typer.Option(
+        ..., "--from-file", help="syllabus YAML drafted in conversation"
+    ),
+):
     store = _store()
     _profile(subject)
     try:
@@ -68,12 +74,12 @@ def _session(goal: str):
     ppath = pending_path(store.data_dir, goal)
     pending = load_pending(ppath)
     if pending is None:
-        typer.echo(f"no session in progress for '{goal}' — run: seba start {goal}",
-                   err=True)
+        typer.echo(
+            f"no session in progress for '{goal}' — run: seba start {goal}", err=True
+        )
         raise typer.Exit(1)
     state = store.load_goal(goal)
-    handler = ToolHandler(pending.agenda, state.syllabus,
-                          config.data_dir() / "sources")
+    handler = ToolHandler(pending.agenda, state.syllabus, config.data_dir() / "sources")
     handler.record = pending.record
     return store, pending, handler, ppath
 
@@ -108,51 +114,73 @@ def start(goal: str):
     ppath = pending_path(store.data_dir, goal)
     pending = load_pending(ppath)
     if pending is None:
-        agenda = build_agenda(state, profile, date.today(),
-                              config.data_dir() / "sources")
+        agenda = build_agenda(
+            state, profile, date.today(), config.data_dir() / "sources"
+        )
         pending = PendingSession(goal=goal, agenda=agenda, started=date.today())
         save_pending(ppath, pending)
     else:
         typer.echo("(resuming session in progress)")
     graded = sorted({r.id for r in pending.record.reviews})
-    typer.echo(yaml.safe_dump({
-        "agenda": pending.agenda.model_dump(),
-        "subject_style": load_overlay(state.subject),
-        "already_graded": graded,
-        "ungraded_reviews": [r.id for r in pending.agenda.review_items
-                             if r.id not in set(graded)],
-        "minted_so_far": len(pending.record.new_items),
-    }, sort_keys=False, allow_unicode=True))
+    typer.echo(
+        yaml.safe_dump(
+            {
+                "agenda": pending.agenda.model_dump(),
+                "subject_style": load_overlay(state.subject),
+                "already_graded": graded,
+                "ungraded_reviews": [
+                    r.id for r in pending.agenda.review_items if r.id not in set(graded)
+                ],
+                "minted_so_far": len(pending.record.new_items),
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        )
+    )
 
 
 @app.command()
-def grade(goal: str, item_id: str, grade: str,
-          note: str | None = typer.Option(None)):
+def grade(goal: str, item_id: str, grade: str, note: str | None = typer.Option(None)):
     _dispatch(goal, "grade_review", {"id": item_id, "grade": grade, "note": note})
 
 
 @app.command()
-def mint(goal: str, concept: str = typer.Option(...),
-         type: str = typer.Option(...), front: str = typer.Option(...),
-         back: str = typer.Option(...)):
-    _dispatch(goal, "mint_item", {"concept": concept, "type": type,
-                                  "front": front, "back": back})
+def mint(
+    goal: str,
+    concept: str = typer.Option(...),
+    type: str = typer.Option(...),
+    front: str = typer.Option(...),
+    back: str = typer.Option(...),
+):
+    _dispatch(
+        goal,
+        "mint_item",
+        {"concept": concept, "type": type, "front": front, "back": back},
+    )
 
 
 @app.command("concept")
-def concept_cmd(goal: str, concept_id: str,
-                status: str | None = typer.Option(None, help="started|completed"),
-                note: str | None = typer.Option(None)):
-    _dispatch(goal, "update_concept",
-              {"id": concept_id, "status_change": status, "note": note})
+def concept_cmd(
+    goal: str,
+    concept_id: str,
+    status: str | None = typer.Option(None, help="started|completed"),
+    note: str | None = typer.Option(None),
+):
+    _dispatch(
+        goal,
+        "update_concept",
+        {"id": concept_id, "status_change": status, "note": note},
+    )
 
 
 @app.command()
-def end(goal: str, summary: str = typer.Option(...),
-        hint: str = typer.Option(..., "--hint")):
+def end(
+    goal: str, summary: str = typer.Option(...), hint: str = typer.Option(..., "--hint")
+):
     store, pending, handler, ppath = _session(goal)
     result, is_error = handler.handle(
-        "end_session", {"summary": summary, "next_session_hint": hint})
+        "end_session", {"summary": summary, "next_session_hint": hint}
+    )
     if is_error:
         typer.echo(result, err=True)
         raise typer.Exit(1)
@@ -160,8 +188,12 @@ def end(goal: str, summary: str = typer.Option(...),
 
 
 @app.command()
-def abandon(goal: str, discard: bool = typer.Option(
-        False, "--discard", help="drop recorded outcomes instead of saving INCOMPLETE")):
+def abandon(
+    goal: str,
+    discard: bool = typer.Option(
+        False, "--discard", help="drop recorded outcomes instead of saving INCOMPLETE"
+    ),
+):
     store, pending, handler, ppath = _session(goal)
     if discard:
         clear_pending(ppath)

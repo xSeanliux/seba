@@ -2,20 +2,34 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from seba.models import Agenda, GradeReview, PendingSession, ReviewItem, SessionRecord
-from seba.session.pending import (PendingError, clear_pending, load_pending,
-                                  pending_path, save_pending)
+from seba.models import Agenda, GradeReview, PendingSession, ReviewItem
+from seba.session.pending import (
+    PendingError,
+    clear_pending,
+    load_pending,
+    pending_path,
+    save_pending,
+)
 
 
 def agenda():
-    return Agenda(goal="prob", subject="probability", session_number=1,
-                  briefing="b",
-                  review_items=[ReviewItem(id="it-1", type="recall", front="f", back="b")],
-                  teach_concept=None, practice_quota=3, pace_hint="steady")
+    return Agenda(
+        goal="prob",
+        subject="probability",
+        session_number=1,
+        briefing="b",
+        review_items=[ReviewItem(id="it-1", type="recall", front="f", back="b")],
+        teach_concept=None,
+        practice_quota=3,
+        pace_hint="steady",
+    )
 
 
 def test_pending_path(tmp_path: Path):
-    assert pending_path(tmp_path, "prob") == tmp_path / "goals" / "prob" / "session.pending.yaml"
+    assert (
+        pending_path(tmp_path, "prob")
+        == tmp_path / "goals" / "prob" / "session.pending.yaml"
+    )
 
 
 def test_roundtrip(tmp_path: Path):

@@ -15,7 +15,8 @@ def test_user_profile_overrides(monkeypatch, tmp_path):
     d.mkdir(parents=True)
     (d / "profile.yaml").write_text(
         "name: astronomy\nkind: technical\nmax_reviews_per_session: 4\n"
-        "item_types: [recall]\nsession_shape: teach-heavy\n")
+        "item_types: [recall]\nsession_shape: teach-heavy\n"
+    )
     assert load_profile("astronomy").max_reviews_per_session == 4
 
 
