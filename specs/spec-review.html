@@ -1,0 +1,420 @@
+<title>Tutor — Design Spec Review</title>
+<style>
+  :root {
+    --bg: #FAF9F5; --bg2: #F1EFE8; --ink: #20242B; --ink2: #5A5F6B;
+    --accent: #33518E; --accent-bg: #33518E14;
+    --hl: #B8860B; --hl-bg: #B8860B14; --hl-border: #B8860B55;
+    --line: #D8D5CB; --code-bg: #EFEDE5;
+    --good: #2F7D4F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15181E; --bg2: #1C2027; --ink: #E6E4DD; --ink2: #9BA0AB;
+      --accent: #8FA8E0; --accent-bg: #8FA8E01A;
+      --hl: #E3B341; --hl-bg: #E3B34114; --hl-border: #E3B34155;
+      --line: #333945; --code-bg: #1E232C;
+      --good: #6BBF8E;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #FAF9F5; --bg2: #F1EFE8; --ink: #20242B; --ink2: #5A5F6B;
+    --accent: #33518E; --accent-bg: #33518E14;
+    --hl: #B8860B; --hl-bg: #B8860B14; --hl-border: #B8860B55;
+    --line: #D8D5CB; --code-bg: #EFEDE5;
+    --good: #2F7D4F;
+  }
+  :root[data-theme="dark"] {
+    --bg: #15181E; --bg2: #1C2027; --ink: #E6E4DD; --ink2: #9BA0AB;
+    --accent: #8FA8E0; --accent-bg: #8FA8E01A;
+    --hl: #E3B341; --hl-bg: #E3B34114; --hl-border: #E3B34155;
+    --line: #333945; --code-bg: #1E232C;
+    --good: #6BBF8E;
+  }
+  html { background: var(--bg); }
+  body {
+    font-family: Charter, Georgia, 'Times New Roman', serif;
+    color: var(--ink); background: var(--bg);
+    line-height: 1.55; font-size: 17px;
+  }
+  .mono, code, pre, .tag { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+  header.top {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--bg); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 1rem;
+    padding: .7rem 1.2rem;
+  }
+  header.top h1 { font-size: 1rem; font-weight: 700; margin: 0; flex: 1; }
+  header.top .sub { color: var(--ink2); font-size: .8rem; font-family: ui-monospace, Menlo, monospace; }
+  #exportBtn {
+    font-family: ui-monospace, Menlo, monospace; font-size: .8rem;
+    background: var(--hl-bg); color: var(--hl);
+    border: 1px solid var(--hl-border); border-radius: 4px;
+    padding: .45rem .8rem; cursor: pointer;
+  }
+  #exportBtn:hover, #exportBtn:focus-visible { background: var(--hl); color: var(--bg); outline: none; }
+  .layout { display: flex; gap: 2.5rem; max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.2rem 6rem; }
+  nav.toc { width: 220px; flex-shrink: 0; position: sticky; top: 4rem; align-self: flex-start;
+            max-height: calc(100vh - 5rem); overflow-y: auto; font-size: .82rem;
+            font-family: ui-monospace, Menlo, monospace; }
+  nav.toc a { display: flex; align-items: baseline; gap: .4rem; color: var(--ink2);
+              text-decoration: none; padding: .22rem 0; }
+  nav.toc a:hover { color: var(--accent); }
+  nav.toc a .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hl);
+                   flex-shrink: 0; visibility: hidden; position: relative; top: -1px; }
+  nav.toc a.has-note .dot { visibility: visible; }
+  main { flex: 1; min-width: 0; max-width: 70ch; }
+  @media (max-width: 800px) { nav.toc { display: none; } .layout { padding: 1rem .9rem 4rem; } }
+
+  section.spec { margin: 0 0 .8rem; border-bottom: 1px solid var(--line); padding: 1.4rem 0 1.6rem; }
+  section.spec:last-of-type { border-bottom: none; }
+  .sec-head { display: flex; align-items: baseline; gap: .8rem; }
+  .sec-head h2 { font-size: 1.35rem; margin: 0 0 .6rem; text-wrap: balance; flex: 1; }
+  h3 { font-size: 1.02rem; margin: 1.3rem 0 .4rem; }
+  p { margin: .55rem 0; }
+  ul, ol { margin: .5rem 0; padding-left: 1.4rem; }
+  li { margin: .25rem 0; }
+  .eyebrow { font-family: ui-monospace, Menlo, monospace; font-size: .72rem; color: var(--accent);
+             letter-spacing: .08em; text-transform: uppercase; display: block; margin-bottom: .3rem; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+        padding: .8rem 1rem; overflow-x: auto; font-size: .8rem; line-height: 1.5; margin: .7rem 0; }
+  code { background: var(--code-bg); padding: .08em .35em; border-radius: 3px; font-size: .82em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; margin: .7rem 0; }
+  .table-wrap { overflow-x: auto; }
+  th, td { text-align: left; padding: .45rem .7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: ui-monospace, Menlo, monospace; font-size: .72rem; letter-spacing: .06em;
+       text-transform: uppercase; color: var(--ink2); }
+  .callout { background: var(--accent-bg); border-left: 3px solid var(--accent);
+             padding: .6rem .9rem; border-radius: 0 6px 6px 0; margin: .8rem 0; font-size: .92rem; }
+  .tag { font-size: .68rem; padding: .1rem .45rem; border-radius: 3px; letter-spacing: .04em;
+         background: var(--accent-bg); color: var(--accent); white-space: nowrap; }
+
+  .note-btn {
+    font-family: ui-monospace, Menlo, monospace; font-size: .72rem;
+    background: none; border: 1px dashed var(--hl-border); color: var(--hl);
+    border-radius: 4px; padding: .25rem .6rem; cursor: pointer; flex-shrink: 0;
+  }
+  .note-btn:hover, .note-btn:focus-visible { background: var(--hl-bg); outline: none; }
+  .note-area { display: none; margin-top: 1rem; }
+  .note-area.open { display: block; }
+  .note-area label { display: block; font-family: ui-monospace, Menlo, monospace;
+                     font-size: .7rem; color: var(--hl); letter-spacing: .06em;
+                     text-transform: uppercase; margin-bottom: .3rem; }
+  .note-area textarea {
+    width: 100%; box-sizing: border-box; min-height: 4.5rem; resize: vertical;
+    background: var(--hl-bg); border: 1px solid var(--hl-border); border-radius: 6px;
+    color: var(--ink); font-family: ui-monospace, Menlo, monospace; font-size: .82rem;
+    line-height: 1.5; padding: .6rem .8rem;
+  }
+  .note-area textarea:focus-visible { outline: 2px solid var(--hl); outline-offset: 1px; }
+  .saved { font-size: .68rem; color: var(--ink2); font-family: ui-monospace, Menlo, monospace;
+           margin-top: .25rem; min-height: 1em; }
+  .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+           background: var(--ink); color: var(--bg); padding: .6rem 1.1rem; border-radius: 6px;
+           font-family: ui-monospace, Menlo, monospace; font-size: .8rem; opacity: 0;
+           transition: opacity .25s; pointer-events: none; z-index: 50; }
+  .toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+
+<header class="top">
+  <h1>Tutor — Design Spec Review</h1>
+  <span class="sub" id="noteCount"></span>
+  <button id="exportBtn" type="button">Copy feedback as Markdown</button>
+</header>
+
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sections"></nav>
+<main id="main">
+
+<section class="spec" data-sec="Overview" id="s-overview">
+  <div class="sec-head"><h2>1 · What this is</h2></div>
+  <p>A long-term personal tutor that runs in the terminal. You converse with it daily; it teaches through guided dialogue and practice questions. Unlike chat "learning modes", it owns a <strong>curriculum</strong> (concept graph synthesized from a textbook ToC + web research) and a <strong>longitudinal learner state</strong> (known / shaky / due), both plain text in git. Session 40 provably knows what happened in session 1.</p>
+  <p>First two subjects, built simultaneously to force honest abstraction: <strong>Probability</strong> (concept-heavy, teach-heavy) and <strong>Italian</strong> (item-heavy, review-heavy).</p>
+  <p><strong>Out of scope:</strong> learning feed, e-ink, Telegram, web UI, full PDF ingestion. Future satellites attach at the plain-text state seam.</p>
+</section>
+
+<section class="spec" data-sec="The seam" id="s-seam">
+  <div class="sec-head"><h2>2 · Core principle: the seam</h2></div>
+  <p>Split by what must be deterministic vs. what benefits from model judgment:</p>
+  <ul>
+    <li><strong>Code owns:</strong> state storage, schema validation, FSRS scheduling, graph ops, agenda construction, applying updates.</li>
+    <li><strong>LLM owns:</strong> syllabus drafting, teaching dialogue, grading free-form answers, distilling sessions.</li>
+  </ul>
+  <p>The boundary is typed in both directions:</p>
+  <ol>
+    <li><strong>Agenda</strong> (code → LLM): what this session covers, scheduler-computed.</li>
+    <li><strong>Outcome tools</strong> (LLM → code): the tutor records what happens <em>during</em> the session via validated tool calls — <code>grade_review</code>, <code>mint_item</code>, <code>update_concept</code>, <code>end_session</code>. Each call schema-checked the moment it's made (bad args → immediate in-flow retry); grades land while the exchange is fresh; a crash loses nothing already recorded.</li>
+  </ol>
+  <p>A transcript-level extraction pass survives only as crash recovery (<code>tutor extract</code>) for sessions that die before <code>end_session</code>.</p>
+  <div class="callout">The LLM never edits state files — tools are code functions applying validated updates. Code never generates prose. Every module is testable without an LLM by injecting synthetic artifacts at this seam.</div>
+</section>
+
+<section class="spec" data-sec="Repository layout" id="s-repo">
+  <div class="sec-head"><h2>3 · Repository layout</h2></div>
+<pre><code>tutor/
+├── pyproject.toml            # uv; deps: anthropic, py-fsrs, pydantic, rich, pyyaml, typer
+├── src/tutor/
+│   ├── cli.py                # tutor · tutor new-goal · tutor status
+│   ├── config.py             # paths, model ids, subject presets (v0)
+│   ├── models.py             # ALL pydantic schemas — single source of truth
+│   ├── store/                # M1  state persistence (only module touching data/)
+│   ├── scheduler/            # M2  FSRS + concept progression + agenda builder
+│   ├── syllabus/             # M3  concept-graph ops (DAG validate, frontier)
+│   ├── session/              # M4  LLM harness: dialogue + outcome tools + recovery
+│   │   └── prompts/          #     *.md templates, editable without code changes
+│   ├── synthesis/            # M5  goal + ToC → syllabus.yaml (+ profile if missing)
+│   └── ui/                   # M6  terminal REPL (rich)
+├── subjects/                 # subject profiles — DATA, not code
+│   ├── probability/profile.yaml · overlay.md
+│   ├── italian/profile.yaml · overlay.md
+│   └── _templates/technical · language
+├── tests/                    # mirrors src; seam tests need no LLM
+└── data/                     # SEPARATE git repo (learning history)
+    ├── goals/probability/
+    │   ├── goal.yaml  syllabus.yaml  items.jsonl  notes.md
+    │   └── sessions/001.md · 001.outcomes.yaml · 001.transcript.md
+    └── sources/blitzstein/toc.md · ch09.md</code></pre>
+  <ul>
+    <li>Imports strictly downward: <code>ui → session → scheduler → store</code>; no cycles.</li>
+    <li>Prompts are markdown files with <code>{placeholder}</code> substitution.</li>
+    <li><code>data/</code> location via <code>TUTOR_DATA_DIR</code>; store git-commits after every session.</li>
+  </ul>
+</section>
+
+<section class="spec" data-sec="Data model" id="s-data">
+  <div class="sec-head"><h2>4 · Data model</h2></div>
+  <h3>Syllabus — <code>syllabus.yaml</code></h3>
+<pre><code>concepts:
+  - id: conditional-expectation-as-rv
+    name: "Conditional expectation as a random variable"
+    prereqs: [conditional-probability, random-variables]
+    sources: ["blitzstein/ch09.md#9.2"]
+    status: unseen            # unseen | in-progress | done  (v0)
+    est_sessions: 2</code></pre>
+  <p>Prereqs must form a DAG (cycle → hard error naming the cycle). <code>frontier()</code> = concepts whose prereqs are all done.</p>
+
+  <h3>Items — <code>items.jsonl</code></h3>
+<pre><code>{"id":"it-041","concept":"law-of-total-probability","type":"recall",
+ "front":"State the law of total probability","back":"P(A) = Σ P(A|Bᵢ)P(Bᵢ) …",
+ "fsrs":{"stability":4.2,"difficulty":6.1,"due":"2026-07-05","state":"review"},
+ "created":"2026-06-28","suspended":false}</code></pre>
+  <p><code>type</code> ∈ recall · apply · cloze · produce · recognize. The <code>fsrs</code> block is owned by py-fsrs; other modules read only <code>due</code>.</p>
+
+  <h3>Agenda (code → LLM)</h3>
+<pre><code>class Agenda(BaseModel):
+    goal: str; subject: str; session_number: int
+    briefing: str                       # scheduler-assembled memory summary
+    review_items: list[ReviewItem]      # FSRS-due, capped per subject preset
+    teach_concept: TeachConcept | None  # + source_excerpts pulled from files
+    practice_quota: int
+    pace_hint: Literal["push-harder","steady","step-back"]  # from recent success rate</code></pre>
+
+  <h3>Outcome tools (LLM → code, validated per call)</h3>
+<pre><code>grade_review(id, grade: again|hard|good|easy, note?)   # right after each review resolves
+mint_item(concept, type, front, back)                   # worth retaining a month from now
+update_concept(id, status_change?: started|completed, note?)
+end_session(summary, next_session_hint)                 # exactly once, at close</code></pre>
+  <p>Handlers reject unknown ids and over-cap mints (10/session) with an explanation the model sees and corrects in-flow. Accepted calls accumulate in a <code>SessionRecord</code>, applied by the store at save time and serialized to <code>NNN.outcomes.yaml</code> as the audit trail.</p>
+  <p><strong>Deterministic gates</strong> — code checkpoints at the boundaries, dialogue free in the middle: (1) <em>session-end gate:</em> <code>end_session</code>/<code>/done</code> rejected while agenda reviews remain ungraded — handler returns missing ids, model must grade or mark <code>skipped</code> (FSRS untouched, stays due) before close is accepted; (2) <em>save-time invariants:</em> exactly one <code>end_session</code>, grades map to agenda items, statuses move only along legal edges — violation → saved <code>INCOMPLETE</code>, state never corrupted.</p>
+</section>
+
+<section class="spec" data-sec="Mastery model" id="s-mastery">
+  <div class="sec-head"><h2>5 · Mastery — versioned honesty</h2></div>
+  <div class="table-wrap"><table>
+    <tr><th>Layer</th><th>Mechanism</th><th>Epistemic grade</th></tr>
+    <tr><td>Items</td><td>FSRS (py-fsrs, retention 0.9). Grade comes from LLM assessing your actual answer — no self-report buttons.</td><td>Principled (fitted memory model)</td></tr>
+    <tr><td>Concepts v0</td><td>Checkboxes (unseen / in-progress / done) + free-text <code>notes.md</code> surfaced verbatim in briefings.</td><td>Deliberately simple</td></tr>
+    <tr><td>Concepts v1</td><td>Evidence ladder: introduced → practicing (1 correct) → solid (≥3 correct across ≥2 sessions) → mastered (probe ≥7 days later). 2 consecutive fails → demote one rung.</td><td>Heuristic, countable, tunable</td></tr>
+    <tr><td>Difficulty</td><td>No fake numbers. Measured success rate → coarse <code>pace_hint</code> (&gt;90% push-harder, &lt;70% step-back).</td><td>Signal, not measurement</td></tr>
+  </table></div>
+  <p>Post-v1 option: BKT posterior per concept at the same seam.</p>
+</section>
+
+<section class="spec" data-sec="Modules" id="s-modules">
+  <div class="sec-head"><h2>6 · Modules (contracts)</h2></div>
+  <div class="table-wrap"><table>
+    <tr><th>Module</th><th>Purpose / key interface</th><th>Acceptance</th></tr>
+    <tr><td><span class="tag">M1 store</span></td><td>Only disk-toucher. <code>load_goal · save_session · create_goal · list_goals</code>. One git commit per session.</td><td>Round-trip <code>load(save(x))==x</code>; atomic writes; loud errors on malformed files.</td></tr>
+    <tr><td><span class="tag">M2 scheduler</span></td><td><code>due_items · apply_review · mint_item · build_agenda</code>. Teach pick: first in-progress, else frontier, else review-only.</td><td>Deterministic (state+date → same agenda); 30-day sim: intervals grow on <code>good</code>, <code>again</code> → due ≤1 day; never violates DAG.</td></tr>
+    <tr><td><span class="tag">M3 syllabus</span></td><td><code>load_syllabus · frontier · apply_status</code>.</td><td>Cycle named in error; frontier correct on diamond/chain/disconnected fixtures.</td></tr>
+    <tr><td><span class="tag">M4 session</span></td><td><code>run_session(agenda, profile, io)</code> → (SessionRecord, transcript). Tools dispatched in-flow with validation feedback; grading rubric lives in <code>grade_review</code>'s description. <code>recover_session</code> backfills crashed sessions (cheap model). Transcript never fed to future sessions.</td><td>Tool handlers unit-tested (invalid id, over-cap, double end_session); scripted <code>SessionIO</code> + mocked model; 3+ recovery fixtures.</td></tr>
+    <tr><td><span class="tag">M5 synthesis</span></td><td>ToC → draft <code>syllabus.yaml</code> → <code>$EDITOR</code> → validate (errors as YAML comments on retry). No matching subject profile → drafts <code>profile.yaml</code> + <code>overlay.md</code> from templates too. v1: agentic + web search, same interface.</td><td>Output always passes validation or the editor loop engages.</td></tr>
+    <tr><td><span class="tag">M6 ui</span></td><td>Thin REPL: goal picker → briefing card → streaming chat → one-line receipt. <code>tutor status</code> table.</td><td>Manual; rich handles resize/streaming.</td></tr>
+  </table></div>
+</section>
+
+<section class="spec" data-sec="Session lifecycle" id="s-lifecycle">
+  <div class="sec-head"><h2>7 · Session lifecycle</h2></div>
+<pre><code>tutor
+ └─ load goal → build agenda → briefing card
+ └─ run_session:
+     1. tutor opens with continuity ("last time…"), poses first due review
+     2. per review: you answer → corrective feedback, misconception named
+          → grade_review(...) recorded silently → next
+     3. reviews done → teach segment: worked example → faded → solo practice
+          attempts drive update_concept(...) / mint_item(...)
+     4. tangents anytime; tutor may fetch_source(ref)
+     5. /done (or budget) → verbal recap → end_session(summary, hint)
+ └─ scheduler finalizes FSRS state; syllabus statuses applied
+ └─ store.save_session(...)           ← one git commit
+ └─ receipt: "4 reviewed · 2 minted · conditional-expectation → in-progress"</code></pre>
+  <p><strong>Failure handling:</strong> tool calls are accepted <em>during</em> the session, so a crash loses nothing already recorded — partials saved with an <code>INCOMPLETE</code> marker; <code>tutor extract &lt;goal&gt; &lt;n&gt;</code> backfills anything after the last accepted call. A session's learning is never lost to a parse error.</p>
+</section>
+
+<section class="spec" data-sec="Prompts" id="s-prompts">
+  <div class="sec-head"><h2>8 · Prompts (contracts)</h2></div>
+  <ul>
+    <li><strong>system_base.md</strong> — subject-agnostic; all subject character lives in overlays. Long-term tutor mid-relationship; briefing is your memory. Pedagogy: worked example → faded scaffolding → independent practice; ~85% target success; honor <code>pace_hint</code>; name misconceptions when correcting; weave reviews in early, get a real attempt, call <code>grade_review</code> as each resolves; tangents allowed (record durable bits via tools); never dump an answer one hint away; recap aloud, then <code>end_session</code>.</li>
+    <li><strong>subjects/probability/overlay.md</strong> — Unicode math (𝔼[X|Y], σ-algebra), LaTeX fences only for long derivations; practice = compute / prove-sketch / counterexample; statements <em>and</em> intuitions.</li>
+    <li><strong>subjects/italian/overlay.md</strong> — increasing fraction of session in Italian by level; production over recognition; correct by recasting, then drill the pattern.</li>
+    <li><strong>Tool descriptions carry contracts</strong> — grading rubric (wrong → again; correct-with-hints → hard; correct → good; instant → easy) lives in <code>grade_review</code>; "worth retaining in a month" lives in <code>mint_item</code>.</li>
+    <li><strong>New subjects need zero code:</strong> a subject = <code>profile.yaml</code> (scheduling knobs) + <code>overlay.md</code>, drafted from templates by <code>new-goal</code> when missing, edited in <code>$EDITOR</code>.</li>
+  </ul>
+</section>
+
+<section class="spec" data-sec="UX" id="s-ux">
+  <div class="sec-head"><h2>9 · UX — what the user does</h2></div>
+  <p><strong>Once per goal (~30 min):</strong> <code>tutor new-goal probability --toc blitzstein-toc.md</code> → skim/edit the drafted syllabus in <code>$EDITOR</code>. The only real setup — and it's your curriculum.</p>
+  <p><strong>Every time:</strong> type <code>tutor</code>, pick goal, talk. Quit whenever — extraction and save are automatic. Zero bookkeeping: no self-grading, no card authoring, no marking complete. The conversation is the interface.</p>
+  <p><strong>Sometimes:</strong> <code>tutor status</code>; approve syllabus revision diffs; edit YAML when an estimate feels wrong; drop in a new source file.</p>
+</section>
+
+<section class="spec" data-sec="Context budget" id="s-context">
+  <div class="sec-head"><h2>9a · Context budget</h2></div>
+  <p>The scheduler is the context firewall: the model sees a <em>selection</em>, never the state. Enforced in <code>build_agenda</code>:</p>
+  <ul>
+    <li><strong>Items:</strong> only FSRS-due, capped per profile (6 / 20). The thousands-card <code>items.jsonl</code> never enters context.</li>
+    <li><strong>Syllabus:</strong> briefing names counts + frontier (≤10 concept names), never the full graph.</li>
+    <li><strong>Notes:</strong> <code>notes.md</code> structured per-concept; briefing includes only this session's scope (review items' concepts, teach concept + direct prereqs), ≤3 newest notes each, ~1k-token budget, oldest truncated first.</li>
+    <li><strong>Sources:</strong> section-granularity excerpts, ~4k-token budget; over → keep primary, drop rest, note it.</li>
+    <li><strong>History:</strong> last session's hint only; transcripts never fed forward.</li>
+    <li><strong>Consolidation (v1):</strong> <code>tutor gc</code> — a concept's notes exceed 5 → cheap-model pass distills them into one.</li>
+  </ul>
+  <div class="callout">Net: session context ≈ system prompt (~2k) + agenda (~1–5k) + live dialogue — independent of months of history or thousands of items.</div>
+</section>
+
+<section class="spec" data-sec="Build order" id="s-build">
+  <div class="sec-head"><h2>10 · Build order</h2></div>
+  <h3>Milestone v0 — the loop</h3>
+  <ol>
+    <li><code>models.py</code> + M1 store + M3 syllabus, with tests <em>(no LLM)</em></li>
+    <li>M2 scheduler + 30-day simulation test <em>(no LLM)</em></li>
+    <li>M4 session: dialogue + outcome tools + recovery, fixture-tested</li>
+    <li>M5 synthesis (single-call, incl. profile drafting) + M6 REPL + CLI</li>
+    <li><strong>Dogfood gate:</strong> both real goals, 3 real sessions each across ≥3 days. Success = session N+1's briefing correctly reflects session N.</li>
+  </ol>
+  <p>Steps 1–2 and 3 parallelize across agents once <code>models.py</code> is merged; <code>models.py</code> is a single owned artifact, first.</p>
+  <h3>Milestone v1 — by observed pain</h3>
+  <p>Concept ladder · <strong><code>tutor drill &lt;goal&gt;</code></strong> — review-only rapid-fire mode (the "dojo"; same agenda machinery, terse overlay — for when Italian's due queue outgrows conversational weaving) · agentic synthesis with web search · pace model from logs · notes consolidation (<code>tutor gc</code>) · <code>tutor extract</code> polish · TUI upgrade (textual).</p>
+</section>
+
+<section class="spec" data-sec="Testing and risks" id="s-risks">
+  <div class="sec-head"><h2>11 · Testing &amp; risks</h2></div>
+  <p><strong>Testing:</strong> seam tests dominate (synthetic state → agenda; synthetic outcomes → state; zero API cost). Fixture transcripts for extraction in a separate <code>pytest -m llm</code> tier. 30-day FSRS sim doubles as the BKT-sim spike. Dogfooding is the real test.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Risk</th><th>Mitigation</th></tr>
+    <tr><td>Tutor misgrades or forgets tool calls → memory corrupts/gaps silently</td><td>Rubric in tool descriptions; session-end gate blocks close until every item graded or skipped; save-time invariants; audit trail; human-editable</td></tr>
+    <tr><td>Tutor lectures instead of dialogues</td><td>Prompt policy + dogfood gate; prompts are files, cheap to iterate</td></tr>
+    <tr><td>Card flood</td><td>Cap 10/session; suspended flag; month-retention rubric</td></tr>
+    <tr><td>Poor syllabus draft</td><td>Human $EDITOR review is a hard gate</td></tr>
+    <tr><td>Two subjects double prompt tuning</td><td>Shared base, short overlays, dogfood both day one</td></tr>
+  </table></div>
+  <p><strong>Config defaults:</strong> dialogue <code>claude-sonnet-5</code>, extraction <code>claude-haiku-4-5</code> (both env-overridable); Python ≥3.12 + uv; FSRS defaults, retention 0.9.</p>
+</section>
+
+<section class="spec" data-sec="General feedback" id="s-general">
+  <div class="sec-head"><h2>12 · Anything else</h2></div>
+  <p>Overall reactions, missing pieces, priority changes — anything that doesn't fit a section above.</p>
+</section>
+
+</main>
+</div>
+<div class="toast" id="toast" role="status">Copied</div>
+
+<script>
+(function () {
+  const KEY = 'tutor-spec-feedback-v1';
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
+  const save = (d) => localStorage.setItem(KEY, JSON.stringify(d));
+  let notes = load();
+
+  const secs = [...document.querySelectorAll('section.spec')];
+  const toc = document.getElementById('toc');
+
+  secs.forEach(sec => {
+    const name = sec.dataset.sec;
+    // toc entry
+    const a = document.createElement('a');
+    a.href = '#' + sec.id;
+    a.innerHTML = '<span class="dot"></span>' + name;
+    toc.appendChild(a);
+
+    // annotate button + textarea
+    const head = sec.querySelector('.sec-head');
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'note-btn';
+    const area = document.createElement('div');
+    area.className = 'note-area';
+    area.innerHTML = '<label>Your feedback — ' + name + '</label>';
+    const ta = document.createElement('textarea');
+    ta.placeholder = 'Objections, questions, changes…';
+    const saved = document.createElement('div');
+    saved.className = 'saved';
+    area.appendChild(ta); area.appendChild(saved);
+    head.appendChild(btn); sec.appendChild(area);
+
+    const refresh = () => {
+      const has = !!(notes[name] && notes[name].trim());
+      btn.textContent = has ? '✎ edit note' : '+ annotate';
+      a.classList.toggle('has-note', has);
+      updateCount();
+    };
+    ta.value = notes[name] || '';
+    if (ta.value.trim()) area.classList.add('open');
+    refresh();
+
+    btn.addEventListener('click', () => {
+      area.classList.toggle('open');
+      if (area.classList.contains('open')) ta.focus();
+    });
+    let t;
+    ta.addEventListener('input', () => {
+      notes[name] = ta.value; save(notes); refresh();
+      saved.textContent = 'saving…';
+      clearTimeout(t); t = setTimeout(() => { saved.textContent = 'saved locally'; }, 400);
+    });
+  });
+
+  function updateCount() {
+    const n = Object.values(notes).filter(v => v && v.trim()).length;
+    document.getElementById('noteCount').textContent = n ? n + ' note' + (n > 1 ? 's' : '') : '';
+  }
+  updateCount();
+
+  document.getElementById('exportBtn').addEventListener('click', async () => {
+    const parts = ['# Feedback on Tutor design spec', ''];
+    let any = false;
+    secs.forEach(sec => {
+      const name = sec.dataset.sec;
+      if (notes[name] && notes[name].trim()) {
+        any = true;
+        parts.push('## ' + name, '', notes[name].trim(), '');
+      }
+    });
+    const text = any ? parts.join('\n') : '(no notes yet)';
+    const toast = document.getElementById('toast');
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.textContent = any ? 'Copied — paste it back to Claude' : 'No notes yet';
+    } catch {
+      toast.textContent = 'Copy failed — select & copy below';
+      const pre = document.createElement('pre');
+      pre.textContent = text;
+      document.getElementById('s-general').appendChild(pre);
+    }
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2200);
+  });
+})();
+</script>
