@@ -33,13 +33,14 @@ class Store:
         (data_dir / "sources").mkdir(exist_ok=True)
         if not (data_dir / ".git").exists():
             self._git("init")
-            # The data repo is Seba's own; give it a local identity so commits
-            # work without relying on the machine's global git config (a fresh
-            # box or CI runner has none), and disable signing so an ambient
-            # commit.gpgsign=true can't block our automated commits.
-            self._git("config", "user.name", "seba")
-            self._git("config", "user.email", "seba@localhost")
-            self._git("config", "commit.gpgsign", "false")
+        # The data repo is Seba's own; give it a local identity so commits work
+        # without relying on the machine's global git config (a fresh box or CI
+        # runner has none), and disable signing so an ambient commit.gpgsign=true
+        # can't block our automated commits. Set unconditionally (idempotent) so
+        # a data repo created before this fix also gets it.
+        self._git("config", "user.name", "seba")
+        self._git("config", "user.email", "seba@localhost")
+        self._git("config", "commit.gpgsign", "false")
 
     def _git(self, *args: str) -> None:
         subprocess.run(

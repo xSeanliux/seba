@@ -46,3 +46,21 @@ def test_new_goal_unknown_subject(monkeypatch, tmp_path):
         app, ["new-goal", "x", "--subject", "nonexistent", "--from-file", str(f)]
     )
     assert result.exit_code == 1
+
+
+def test_new_goal_missing_file_rejected(monkeypatch, tmp_path):
+    monkeypatch.setenv("SEBA_DATA_DIR", str(tmp_path / "data"))
+    result = runner.invoke(
+        app,
+        [
+            "new-goal",
+            "prob",
+            "--subject",
+            "probability",
+            "--from-file",
+            str(tmp_path / "nope.yaml"),
+        ],
+    )
+    assert result.exit_code != 0  # typer rejects a nonexistent path, no traceback
+    assert result.exception is None or isinstance(result.exception, SystemExit)
+    assert not (tmp_path / "data" / "goals" / "prob").exists()

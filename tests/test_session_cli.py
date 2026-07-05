@@ -77,6 +77,29 @@ def test_start_resumes_existing_pending(monkeypatch, tmp_path):
     assert out["already_graded"] == ["it-1"] and out["ungraded_reviews"] == []
 
 
+def test_malformed_pending_fails_cleanly(monkeypatch, tmp_path):
+    from seba.session.pending import PendingError
+
+    data = env(monkeypatch, tmp_path)
+    seed(data)
+    runner.invoke(app, ["start", "prob"])
+    (data / "goals" / "prob" / "session.pending.yaml").write_text("not: [valid: yaml")
+    result = runner.invoke(app, ["grade", "prob", "it-1", "good"])
+    assert result.exit_code == 1
+    assert not isinstance(result.exception, PendingError)  # clean exit, no traceback
+    assert "session.pending.yaml" in result.output
+
+
+def test_resume_without_subject_profile(monkeypatch, tmp_path):
+    data = env(monkeypatch, tmp_path)
+    seed(data)
+    runner.invoke(app, ["start", "prob"])  # builds pending while profile exists
+    # profile vanishes mid-session; resume must not need it
+    monkeypatch.setattr("seba.config.subjects_dirs", lambda: [tmp_path / "none"])
+    result = runner.invoke(app, ["start", "prob"])
+    assert result.exit_code == 0 and "resuming" in result.output
+
+
 def test_grade_records_and_rejects_duplicates_and_unknowns(monkeypatch, tmp_path):
     data = env(monkeypatch, tmp_path)
     seed(data)

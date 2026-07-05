@@ -9,7 +9,13 @@ from seba.models import PendingSession, SubjectProfile
 from seba.scheduler.agenda import build_agenda
 from seba.scheduler.apply import apply_record
 from seba.session.loader import load_overlay, load_profile
-from seba.session.pending import clear_pending, load_pending, pending_path, save_pending
+from seba.session.pending import (
+    PendingError,
+    clear_pending,
+    load_pending,
+    pending_path,
+    save_pending,
+)
 from seba.session.tools import ToolHandler
 from seba.store.store import Store
 from seba.syllabus.graph import SyllabusError, load_syllabus
@@ -40,7 +46,11 @@ def new_goal(
     name: str,
     subject: str = typer.Option(...),
     from_file: Path = typer.Option(
-        ..., "--from-file", help="syllabus YAML drafted in conversation"
+        ...,
+        "--from-file",
+        exists=True,
+        dir_okay=False,
+        help="syllabus YAML drafted in conversation",
     ),
 ):
     store = _store()
@@ -68,11 +78,20 @@ def status():
 NO_TRANSCRIPT = "(session conducted via Claude Code; no transcript captured)\n"
 
 
+def _load_pending_or_exit(ppath: Path) -> PendingSession | None:
+    """load_pending, but turn a malformed file into a clean stderr + exit 1."""
+    try:
+        return load_pending(ppath)
+    except PendingError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+
+
 def _session(goal: str):
     """Load the in-progress session or exit with a hint."""
     store = _store()
     ppath = pending_path(store.data_dir, goal)
-    pending = load_pending(ppath)
+    pending = _load_pending_or_exit(ppath)
     if pending is None:
         typer.echo(
             f"no session in progress for '{goal}' — run: seba start {goal}", err=True
@@ -110,10 +129,10 @@ def _finish(store: Store, goal: str, pending: PendingSession, ppath) -> None:
 def start(goal: str):
     store = _store()
     state = store.load_goal(goal)
-    profile = _profile(state.subject)
     ppath = pending_path(store.data_dir, goal)
-    pending = load_pending(ppath)
+    pending = _load_pending_or_exit(ppath)
     if pending is None:
+        profile = _profile(state.subject)  # only needed to build a new agenda
         agenda = build_agenda(
             state, profile, date.today(), config.data_dir() / "sources"
         )
