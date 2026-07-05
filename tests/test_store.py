@@ -8,6 +8,7 @@ from seba.models import (
     Item,
     MintItem,
     SessionRecord,
+    Status,
     Syllabus,
     UpdateConcept,
 )
@@ -70,7 +71,7 @@ def test_save_session_roundtrip_and_git(store):
                 update={
                     "concepts": [
                         gs.syllabus.concepts[0].model_copy(
-                            update={"status": "in-progress"}
+                            update={"status": Status.IN_PROGRESS}
                         )
                     ]
                 }

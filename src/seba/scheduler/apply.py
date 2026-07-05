@@ -4,7 +4,7 @@ from seba.models import GoalState, SessionRecord, Status
 from seba.scheduler.items import apply_review, mint_item
 from seba.syllabus.graph import SyllabusError, apply_status
 
-_STATUS: dict[str, Status] = {"started": "in-progress", "completed": "done"}
+_STATUS: dict[str, Status] = {"started": Status.IN_PROGRESS, "completed": Status.DONE}
 
 
 def apply_record(state: GoalState, record: SessionRecord, now: datetime) -> GoalState:

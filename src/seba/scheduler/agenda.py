@@ -5,6 +5,7 @@ from pathlib import Path
 from seba.models import (
     Agenda,
     GoalState,
+    Grade,
     PaceHint,
     ReviewItem,
     SubjectProfile,
@@ -40,15 +41,15 @@ def resolve_excerpt(sources_dir: Path, ref: str, budget: int) -> str | None:
 
 
 def _pace(recent: Sequence[str]) -> PaceHint:
-    graded = [g for g in recent if g != "skipped"]
+    graded = [g for g in recent if g != Grade.SKIPPED]
     if not graded:
-        return "steady"
-    rate = sum(g in ("good", "easy") for g in graded) / len(graded)
+        return PaceHint.STEADY
+    rate = sum(g in (Grade.GOOD, Grade.EASY) for g in graded) / len(graded)
     if rate > 0.9:
-        return "push-harder"
+        return PaceHint.PUSH_HARDER
     if rate < 0.7:
-        return "step-back"
-    return "steady"
+        return PaceHint.STEP_BACK
+    return PaceHint.STEADY
 
 
 def build_agenda(

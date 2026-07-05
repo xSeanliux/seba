@@ -47,7 +47,7 @@ def frontier(s: Syllabus) -> list[Concept]:
     ]
 
 
-_ORDER: list[Status] = ["unseen", "in-progress", "done"]
+_ORDER: list[Status] = [Status.UNSEEN, Status.IN_PROGRESS, Status.DONE]
 
 
 def apply_status(s: Syllabus, concept_id: str, status: Status) -> Syllabus:

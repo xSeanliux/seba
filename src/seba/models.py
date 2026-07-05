@@ -1,12 +1,36 @@
 from datetime import date
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
-ItemType = Literal["recall", "apply", "cloze", "produce", "recognize"]
-Grade = Literal["again", "hard", "good", "easy", "skipped"]
-Status = Literal["unseen", "in-progress", "done"]
-PaceHint = Literal["push-harder", "steady", "step-back"]
+
+class ItemType(StrEnum):
+    RECALL = "recall"
+    APPLY = "apply"
+    CLOZE = "cloze"
+    PRODUCE = "produce"
+    RECOGNIZE = "recognize"
+
+
+class Grade(StrEnum):
+    AGAIN = "again"
+    HARD = "hard"
+    GOOD = "good"
+    EASY = "easy"
+    SKIPPED = "skipped"
+
+
+class Status(StrEnum):
+    UNSEEN = "unseen"
+    IN_PROGRESS = "in-progress"
+    DONE = "done"
+
+
+class PaceHint(StrEnum):
+    PUSH_HARDER = "push-harder"
+    STEADY = "steady"
+    STEP_BACK = "step-back"
 
 
 class Concept(BaseModel):
@@ -14,7 +38,7 @@ class Concept(BaseModel):
     name: str
     prereqs: list[str] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list)
-    status: Status = "unseen"
+    status: Status = Status.UNSEEN
     est_sessions: int = 1
 
 

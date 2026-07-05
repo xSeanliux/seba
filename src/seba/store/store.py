@@ -58,7 +58,7 @@ class Store:
             yaml.safe_dump({"name": name, "subject": subject})
         )
         (gdir / "syllabus.yaml").write_text(
-            yaml.safe_dump(syllabus.model_dump(), sort_keys=False)
+            yaml.safe_dump(syllabus.model_dump(mode="json"), sort_keys=False)
         )
         (gdir / "items.jsonl").write_text("")
         (gdir / "notes.md").write_text("")
@@ -117,7 +117,7 @@ class Store:
             f"# Session {n}\n\n{marker}{record.summary or '(no summary)'}\n"
         )
         (sdir / f"{n}.outcomes.yaml").write_text(
-            yaml.safe_dump(record.model_dump(), sort_keys=False)
+            yaml.safe_dump(record.model_dump(mode="json"), sort_keys=False)
         )
         (sdir / f"{n}.transcript.md").write_text(transcript)
 
@@ -127,7 +127,7 @@ class Store:
         )
         tmp.rename(gdir / "items.jsonl")
         (gdir / "syllabus.yaml").write_text(
-            yaml.safe_dump(updated.syllabus.model_dump(), sort_keys=False)
+            yaml.safe_dump(updated.syllabus.model_dump(mode="json"), sort_keys=False)
         )
 
         noted = [c for c in record.concepts if c.note]

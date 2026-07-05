@@ -125,7 +125,7 @@ def start(goal: str):
     typer.echo(
         yaml.safe_dump(
             {
-                "agenda": pending.agenda.model_dump(),
+                "agenda": pending.agenda.model_dump(mode="json"),
                 "subject_style": load_overlay(state.subject),
                 "already_graded": graded,
                 "ungraded_reviews": [
