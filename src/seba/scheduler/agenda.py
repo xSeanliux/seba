@@ -40,7 +40,7 @@ def resolve_excerpt(sources_dir: Path, ref: str, budget: int) -> str | None:
     return text[:budget]
 
 
-def _pace(recent: Sequence[str]) -> PaceHint:
+def _pace(recent: Sequence[Grade]) -> PaceHint:
     graded = [g for g in recent if g != Grade.SKIPPED]
     if not graded:
         return PaceHint.STEADY
