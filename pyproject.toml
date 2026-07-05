@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "seba — a long-term personal tutor in the terminal"
 readme = "README.md"
 authors = [
-    { name = "Sean Liu", email = "zhxnliu@yahoo.com.tw" }
+    { name = "Sean Liu", email = "zhxnliu@gmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
