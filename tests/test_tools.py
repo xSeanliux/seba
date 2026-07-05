@@ -82,14 +82,6 @@ def test_missing_grades(handler):
     assert handler.missing_grades() == ["it-2"]
 
 
-def test_fetch_source(handler, tmp_path):
-    (tmp_path / "x.md").write_text("hello")
-    text, err = handler.handle("fetch_source", {"ref": "x.md"})
-    assert not err and text == "hello"
-    _, err2 = handler.handle("fetch_source", {"ref": "missing.md"})
-    assert err2
-
-
 def test_unknown_tool(handler):
     _, err = handler.handle("nonsense", {})
     assert err

@@ -1,20 +1,8 @@
 from rich.console import Console
-from rich.panel import Panel
 
-from seba.models import Agenda, SessionRecord
+from seba.models import SessionRecord
 
 console = Console()
-
-
-def briefing_card(agenda: Agenda) -> None:
-    teach = agenda.teach_concept.name if agenda.teach_concept else "review only"
-    console.print(
-        Panel(
-            f"{agenda.goal} · session {agenda.session_number} · "
-            f"{len(agenda.review_items)} due · today: {teach}\n\n{agenda.briefing}",
-            title="tutor",
-        )
-    )
 
 
 def receipt(record: SessionRecord) -> None:

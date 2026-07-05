@@ -11,7 +11,6 @@ from seba.models import (
     Syllabus,
     UpdateConcept,
 )
-from seba.scheduler.agenda import resolve_excerpt
 
 MINT_CAP = 10
 
@@ -35,9 +34,6 @@ class ToolHandler:
         return [r.id for r in self.agenda.review_items if r.id not in graded]
 
     def handle(self, name: str, args: dict) -> tuple[str, bool]:
-        if name == "fetch_source":
-            ex = resolve_excerpt(self.sources_dir, str(args.get("ref", "")), 16_000)
-            return (ex, False) if ex is not None else (f"no such source: {args}", True)
         model = TOOL_MODELS.get(name)
         if model is None:
             return f"unknown tool: {name}", True
