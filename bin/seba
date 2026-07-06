@@ -4,7 +4,11 @@
 # resolve lazily on first call.
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# Keep the venv outside the ephemeral plugin bundle so it survives updates.
-export UV_PROJECT_ENVIRONMENT="${SEBA_VENV:-$HOME/.cache/seba/venv}"
+# Dedicated, seba-only venv, kept outside the ephemeral plugin bundle so it
+# survives plugin updates. This never touches the user's own project .venvs or
+# any other uv environment: --project pins uv to the bundle regardless of cwd,
+# and this env var is exported only in THIS wrapper process (and its uv child),
+# so it does not leak into the user's shell. Override with SEBA_VENV.
+export UV_PROJECT_ENVIRONMENT="${SEBA_VENV:-${XDG_CACHE_HOME:-$HOME/.cache}/seba/venv}"
 mkdir -p "$(dirname "$UV_PROJECT_ENVIRONMENT")"
 exec uv run --frozen --quiet --project "$root" seba "$@"
