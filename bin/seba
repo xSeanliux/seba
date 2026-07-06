@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# seba plugin wrapper. The plugin adds this bin/ to the Bash tool's PATH, so a
+# skill's `seba <cmd>` resolves here and runs the bundled CLI via uv. Deps
+# resolve lazily on first call.
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Dedicated, seba-only venv, kept outside the ephemeral plugin bundle so it
+# survives plugin updates. This never touches the user's own project .venvs or
+# any other uv environment: --project pins uv to the bundle regardless of cwd,
+# and this env var is exported only in THIS wrapper process (and its uv child),
+# so it does not leak into the user's shell. Override with SEBA_VENV.
+export UV_PROJECT_ENVIRONMENT="${SEBA_VENV:-${XDG_CACHE_HOME:-$HOME/.cache}/seba/venv}"
+mkdir -p "$(dirname "$UV_PROJECT_ENVIRONMENT")"
+exec uv run --frozen --quiet --project "$root" seba "$@"
