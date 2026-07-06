@@ -40,11 +40,14 @@ def load_syllabus(path: Path) -> Syllabus:
 
 def frontier(s: Syllabus) -> list[Concept]:
     done = {c.id for c in s.concepts if c.status == "done"}
-    return [c for c in s.concepts
-            if c.status != "done" and all(p in done for p in c.prereqs)]
+    return [
+        c
+        for c in s.concepts
+        if c.status != "done" and all(p in done for p in c.prereqs)
+    ]
 
 
-_ORDER: list[Status] = ["unseen", "in-progress", "done"]
+_ORDER: list[Status] = [Status.UNSEEN, Status.IN_PROGRESS, Status.DONE]
 
 
 def apply_status(s: Syllabus, concept_id: str, status: Status) -> Syllabus:
@@ -55,7 +58,8 @@ def apply_status(s: Syllabus, concept_id: str, status: Status) -> Syllabus:
             found = True
             if _ORDER.index(status) != _ORDER.index(c.status) + 1:
                 raise SyllabusError(
-                    f"illegal status move for '{concept_id}': {c.status} -> {status}")
+                    f"illegal status move for '{concept_id}': {c.status} -> {status}"
+                )
             c = c.model_copy(update={"status": status})
         concepts.append(c)
     if not found:

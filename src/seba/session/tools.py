@@ -2,9 +2,15 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
-from seba.models import (Agenda, EndSession, GradeReview, MintItem,
-                         SessionRecord, Syllabus, UpdateConcept)
-from seba.scheduler.agenda import resolve_excerpt
+from seba.models import (
+    Agenda,
+    EndSession,
+    GradeReview,
+    MintItem,
+    SessionRecord,
+    Syllabus,
+    UpdateConcept,
+)
 
 MINT_CAP = 10
 
@@ -14,20 +20,6 @@ TOOL_MODELS: dict[str, type[BaseModel]] = {
     "update_concept": UpdateConcept,
     "end_session": EndSession,
 }
-
-
-def anthropic_tools() -> list[dict]:
-    tools = [{"name": name,
-              "description": model.__doc__ or name,
-              "input_schema": model.model_json_schema()}
-             for name, model in TOOL_MODELS.items()]
-    tools.append({"name": "fetch_source",
-                  "description": "Fetch a source excerpt by ref, "
-                                 "e.g. blitzstein/ch09.md#9.2",
-                  "input_schema": {"type": "object",
-                                   "properties": {"ref": {"type": "string"}},
-                                   "required": ["ref"]}})
-    return tools
 
 
 class ToolHandler:
@@ -42,9 +34,6 @@ class ToolHandler:
         return [r.id for r in self.agenda.review_items if r.id not in graded]
 
     def handle(self, name: str, args: dict) -> tuple[str, bool]:
-        if name == "fetch_source":
-            ex = resolve_excerpt(self.sources_dir, str(args.get("ref", "")), 16_000)
-            return (ex, False) if ex is not None else (f"no such source: {args}", True)
         model = TOOL_MODELS.get(name)
         if model is None:
             return f"unknown tool: {name}", True
@@ -81,9 +70,11 @@ class ToolHandler:
             return "session already ended", True
         missing = self.missing_grades()
         if missing:
-            return ("cannot end: ungraded review items: "
-                    + ", ".join(missing)
-                    + ". Grade each (or grade as 'skipped') first."), True
+            return (
+                "cannot end: ungraded review items: "
+                + ", ".join(missing)
+                + ". Grade each (or grade as 'skipped') first."
+            ), True
         self.record.summary = call.summary
         self.record.next_session_hint = call.next_session_hint
         self.record.complete = True

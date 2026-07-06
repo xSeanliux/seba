@@ -1,12 +1,36 @@
 from datetime import date
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
-ItemType = Literal["recall", "apply", "cloze", "produce", "recognize"]
-Grade = Literal["again", "hard", "good", "easy", "skipped"]
-Status = Literal["unseen", "in-progress", "done"]
-PaceHint = Literal["push-harder", "steady", "step-back"]
+
+class ItemType(StrEnum):
+    RECALL = "recall"
+    APPLY = "apply"
+    CLOZE = "cloze"
+    PRODUCE = "produce"
+    RECOGNIZE = "recognize"
+
+
+class Grade(StrEnum):
+    AGAIN = "again"
+    HARD = "hard"
+    GOOD = "good"
+    EASY = "easy"
+    SKIPPED = "skipped"
+
+
+class Status(StrEnum):
+    UNSEEN = "unseen"
+    IN_PROGRESS = "in-progress"
+    DONE = "done"
+
+
+class PaceHint(StrEnum):
+    PUSH_HARDER = "push-harder"
+    STEADY = "steady"
+    STEP_BACK = "step-back"
 
 
 class Concept(BaseModel):
@@ -14,7 +38,7 @@ class Concept(BaseModel):
     name: str
     prereqs: list[str] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list)
-    status: Status = "unseen"
+    status: Status = Status.UNSEEN
     est_sessions: int = 1
 
 
@@ -66,6 +90,7 @@ class GradeReview(BaseModel):
     Rubric: wrong or no recall -> again; correct with significant
     hesitation or hints -> hard; correct -> good; instant and
     confident -> easy; never reached this session -> skipped."""
+
     id: str
     grade: Grade
     note: str | None = None
@@ -74,6 +99,7 @@ class GradeReview(BaseModel):
 class MintItem(BaseModel):
     """Create a spaced-repetition card. Only for facts/skills worth
     retaining a month from now — not session-local scaffolding."""
+
     concept: str
     type: ItemType
     front: str
@@ -82,6 +108,7 @@ class MintItem(BaseModel):
 
 class UpdateConcept(BaseModel):
     """Record concept progress or a note (misconception, strength)."""
+
     id: str
     status_change: Literal["started", "completed"] | None = None
     note: str | None = None
@@ -89,6 +116,7 @@ class UpdateConcept(BaseModel):
 
 class EndSession(BaseModel):
     """Close the session. Call exactly once, after recapping aloud."""
+
     summary: str
     next_session_hint: str
 
@@ -126,3 +154,10 @@ class GoalSummary(BaseModel):
     subject: str
     session_count: int
     due_count: int
+
+
+class PendingSession(BaseModel):
+    goal: str
+    agenda: Agenda
+    record: SessionRecord = Field(default_factory=SessionRecord)
+    started: date

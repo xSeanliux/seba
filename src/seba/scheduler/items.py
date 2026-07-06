@@ -1,19 +1,28 @@
 from datetime import date, datetime, time, timezone
+from typing import cast
 from uuid import uuid4
 
 from fsrs import Card, Rating, Scheduler
+from fsrs.card import CardDict
 
 from seba.models import Grade, Item, MintItem
 
-_RATING = {"again": Rating.Again, "hard": Rating.Hard,
-           "good": Rating.Good, "easy": Rating.Easy}
+_RATING = {
+    "again": Rating.Again,
+    "hard": Rating.Hard,
+    "good": Rating.Good,
+    "easy": Rating.Easy,
+}
 _scheduler = Scheduler()
 
 
 def due_items(items: list[Item], today: date, limit: int) -> list[Item]:
     cutoff = today.isoformat()
-    due = [i for i in items
-           if not i.suspended and str(i.fsrs.get("due", ""))[:10] <= cutoff]
+    due = [
+        i
+        for i in items
+        if not i.suspended and str(i.fsrs.get("due", ""))[:10] <= cutoff
+    ]
     due.sort(key=lambda i: str(i.fsrs["due"]))
     return due[:limit]
 
@@ -21,16 +30,24 @@ def due_items(items: list[Item], today: date, limit: int) -> list[Item]:
 def apply_review(item: Item, grade: Grade, now: datetime) -> Item:
     if grade == "skipped":
         return item
-    card, _ = _scheduler.review_card(Card.from_dict(item.fsrs), _RATING[grade],
-                                     review_datetime=now)
-    return item.model_copy(update={"fsrs": card.to_dict()})
+    card, _ = _scheduler.review_card(
+        Card.from_dict(cast(CardDict, item.fsrs)), _RATING[grade], review_datetime=now
+    )
+    return item.model_copy(update={"fsrs": dict(card.to_dict())})
 
 
 def mint_item(new: MintItem, today: date) -> Item:
     # py-fsrs stamps a new Card.due from the wall clock; override it to `today`
     # so scheduling stays deterministic in the passed date (spec §M2) and a
     # freshly minted card is due the day it is created.
-    fsrs = Card().to_dict()
+    fsrs = dict(Card().to_dict())
     fsrs["due"] = datetime.combine(today, time.min, tzinfo=timezone.utc).isoformat()
-    return Item(id=f"it-{uuid4().hex[:8]}", concept=new.concept, type=new.type,
-                front=new.front, back=new.back, fsrs=fsrs, created=today)
+    return Item(
+        id=f"it-{uuid4().hex[:8]}",
+        concept=new.concept,
+        type=new.type,
+        front=new.front,
+        back=new.back,
+        fsrs=fsrs,
+        created=today,
+    )

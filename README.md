@@ -6,98 +6,40 @@ instruction-literature genre (Ptahhotep, Amenemope); the glyph 𓇼 also writes
 
 ## What it is
 
-A long-term personal tutor in the terminal. It owns a curriculum (concept
-graph) and longitudinal learner state (FSRS review scheduling + per-concept
-notes), all stored as plain text in a git-backed data directory. Code owns
-state, scheduling, and validation; the LLM owns dialogue and grading, recorded
-through validated outcome tools.
+A long-term personal tutor, mid-relationship with each learner. It owns a
+curriculum (concept graph) and longitudinal learner state (FSRS review
+scheduling + per-concept notes), all stored as plain text in a git-backed data
+directory. Code owns state, scheduling, and validation; Claude Code owns
+dialogue and grading, recorded through validated outcome commands.
+
+Sessions run inside Claude Code — your subscription, not a metered API key, no
+per-token cost. The `seba` CLI owns state, scheduling, and validation; the
+`seba-tutor` skill instructs Claude Code to conduct the dialogue and record
+outcomes through it. You talk to Claude Code; it drives `seba` for you.
 
 ## Install
 
-```bash
-uv sync
-```
-
-Requires Python ≥3.12 and `uv`.
-
-## API key
-
-Set `ANTHROPIC_API_KEY` in the environment — the `learn`, `new-goal`, and
-`extract` commands call the Anthropic API. `status` works offline.
-
-## Environment variables
-
-- `SEBA_DATA_DIR` — where learner data lives (default `~/seba-data`). It is
-  its own git repo; every saved session is a commit.
-- `SEBA_MODEL` — dialogue model (default `claude-sonnet-5`).
-- `SEBA_RECOVERY_MODEL` — recovery/synthesis model (default
-  `claude-haiku-4-5`).
-
-## Commands
-
-### `seba new-goal NAME --subject SUBJECT --toc PATH`
-
-Draft a syllabus from a table-of-contents markdown file via the LLM, edit it
-in `$EDITOR` (re-validates on save, annotating errors as YAML comments), then
-create the goal.
+Requires Python ≥3.12 and [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
-seba new-goal probability-101 --subject probability --toc toc.md
+git clone https://github.com/xSeanliux/seba
+cd seba
+make install   # installs the `seba` CLI + links the seba-tutor skill
 ```
 
-Bundled subjects: `probability`, `italian`. A missing subject profile is a
-friendly error pointing at `subjects/_templates/` to copy — v0 does not
-auto-draft profiles; that lands in v1.
+`make uninstall` reverses it. (Under the hood: `uv tool install .` plus a
+symlink of `skills/seba-tutor` into `~/.claude/skills/`.)
 
-### `seba learn [GOAL]`
+## Use
 
-Also the default when you run bare `seba`. Picks a goal (or takes its name),
-shows the briefing card, and converses with the tutor. During a session,
-`/done` ends it — the tutor must grade or skip every review item first. On
-exit it applies the session outcomes, saves, and prints a receipt.
+From any directory, run `claude`, then ask to study — or invoke `/seba-tutor`.
+Claude Code handles the dialogue and calls `seba` for you.
 
-```bash
-seba learn probability-101
-seba          # same, but prompts you to pick a goal
-```
+Learner data lives in `$SEBA_DATA_DIR` (default `~/seba-data`), its own git
+repo with one commit per saved session. If a session crashes, just ask to study
+again — `seba start` resumes where it left off.
 
-### `seba status`
+## Development
 
-Per-goal table: sessions completed and items due today.
-
-```bash
-seba status
-```
-
-### `seba extract GOAL N`
-
-Recover a crashed session: replay `sessions/NNN.transcript.md` through the
-recovery model to backfill the outcomes, then apply and save.
-
-```bash
-seba extract probability-101 3
-```
-
-## Data directory layout
-
-```
-$SEBA_DATA_DIR/
-├── goals/
-│   └── <name>/
-│       ├── goal.yaml
-│       ├── syllabus.yaml
-│       ├── items.jsonl
-│       ├── notes.md
-│       └── sessions/
-│           ├── 001.md
-│           ├── 001.outcomes.yaml
-│           └── 001.transcript.md
-└── sources/
-```
-
-## The `extract` caveat
-
-`extract` rebuilds the agenda from the goal's *current* state, which can
-differ from the crashed session's original agenda if state has since moved
-on. It is meant to be run immediately after a crash, not as a general-purpose
-replay tool.
+Architecture, invariants, the command reference, and how to run tests live in
+[`docs/development.md`](docs/development.md).
