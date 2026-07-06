@@ -65,16 +65,36 @@ refusal.
 
 1. Interview the learner: goal, prior knowledge, primary source (ask for a
    table of contents — a file or pasted text).
-2. Draft the syllabus YAML yourself: top-level `goal`, `subject`, `concepts`;
-   each concept `id` (kebab-case), `name`, `prereqs` (list of ids), `sources`
-   (refs like `dirname/file.md#section` into `$SEBA_DATA_DIR/sources/`),
-   `status: unseen`, `est_sessions` (1–3). Size concepts to 1–3 sessions;
-   prereq edges may reorder or cut across the book's chapter order; INSERT
-   prerequisite concepts the book assumes but does not teach.
+2. **Draft the syllabus YAML yourself.** You already know the exact schema (below)
+   — draft directly, do NOT read Seba's source to reverse-engineer it. The format:
+
+   ```yaml
+   goal: Understand introductory probability     # one-line description of the goal
+   subject: probability                           # must match the --subject flag below
+   concepts:
+     - id: sample-spaces                          # kebab-case, unique across the file
+       name: Sample spaces and events             # human-readable
+       prereqs: []                                # list of other concept ids (may be [])
+       sources: []                                # refs like "blitzstein/ch01.md#1.2" into
+                                                  # $SEBA_DATA_DIR/sources/ (may be [] if none yet)
+       status: unseen                             # always "unseen" for a new goal
+       est_sessions: 1                            # estimated sessions, 1–3
+     - id: conditional-probability
+       name: Conditional probability and Bayes
+       prereqs: [sample-spaces]                   # edges may reorder / cut across chapter order
+       sources: []
+       status: unseen
+       est_sessions: 2
+   ```
+
+   Every concept field except `id`/`name` has a default, but write them all out.
+   Size each concept to 1–3 sessions; INSERT prerequisite concepts the source
+   assumes but does not teach.
 3. Show the draft to the learner and get explicit approval — this is a hard
    gate, not a formality.
-4. Write it to a temp file and run `seba new-goal NAME --subject S --from-file
-   PATH`. On validation errors (cycles, unknown prereqs, duplicate ids), fix
-   the YAML and retry. Subjects: `probability`, `italian` are bundled; for a
-   new subject, copy a template from the repo's `subjects/_templates/` into
-   `$SEBA_DATA_DIR/subjects/<name>/` first.
+4. Write it to a temp file and run `seba new-goal NAME --subject SUBJECT
+   --from-file PATH`. `new-goal` validates and rejects the file (read the stderr
+   message, fix, retry) on exactly three things: **duplicate concept ids**, a
+   **prereq naming an id not in the file**, or a **prereq cycle**. Subjects
+   `probability`, `italian` are bundled; for a new subject, copy a template from
+   the repo's `subjects/_templates/` into `$SEBA_DATA_DIR/subjects/<name>/` first.
