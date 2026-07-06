@@ -76,11 +76,15 @@ refusal.
 ## Creating a new goal
 
 1. Interview the learner: goal, prior knowledge, primary source. For **grounded**
-   teaching, have the learner place their source material in `$SEBA_DATA_DIR/sources/`
-   as section-headed markdown **split into small files** (e.g. one per chapter).
-   You only need its **table of contents** to draft the syllabus — do NOT paste or
-   read the full text (that would blow context); the ToC gives you the `sources`
-   refs. No source is fine too — the goal just won't be source-grounded.
+   teaching, source material must be **text/markdown files** in `$SEBA_DATA_DIR/sources/`,
+   section-headed and **split into small files** (e.g. one per chapter). Seba reads
+   these as plain text — it does **not** open PDFs or fetch URLs. If the learner's
+   source is a PDF or web page, convert it to markdown first with a CLI tool (e.g.
+   `markitdown`, `pandoc`, `pdftotext`) run in the shell — **not** by reading the
+   file into this conversation — then split it into headed sections under `sources/`.
+   You only need the **table of contents** to draft the syllabus; do NOT paste or
+   read the full text (that would blow context). No source is fine too — the goal
+   just won't be source-grounded.
 2. **Draft the syllabus YAML yourself.** You already know the exact schema (below)
    — draft directly, do NOT read Seba's source to reverse-engineer it. The format:
 
@@ -91,9 +95,10 @@ refusal.
      - id: sample-spaces                          # kebab-case, unique across the file
        name: Sample spaces and events             # human-readable
        prereqs: []                                # list of other concept ids (may be [])
-       sources: []                                # refs into $SEBA_DATA_DIR/sources/, ALWAYS with a
-                                                  # #section, e.g. "blitzstein/ch01.md#1.2" — never a
-                                                  # whole-file ref. [] if no source (teach from memory).
+       sources: []                                # refs to a SMALL slice of a text/markdown file under
+                                                  # $SEBA_DATA_DIR/sources/: prefer "file.md#section" when
+                                                  # the file has headings, else a small standalone file.
+                                                  # Never a whole book. Not PDFs/URLs. [] = teach from memory.
        status: unseen                             # always "unseen" for a new goal
        est_sessions: 1                            # estimated sessions, 1–3
      - id: conditional-probability
