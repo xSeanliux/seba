@@ -24,10 +24,11 @@ Requires Python ≥3.12 and [`uv`](https://docs.astral.sh/uv/).
 ```bash
 git clone https://github.com/xSeanliux/seba
 cd seba
-uv tool install --force .                              # global `seba` command
-mkdir -p ~/.claude/skills
-ln -sfn "$(pwd)/skills/seba-tutor" ~/.claude/skills/seba-tutor
+make install   # installs the `seba` CLI + links the seba-tutor skill
 ```
+
+`make uninstall` reverses it. (Under the hood: `uv tool install .` plus a
+symlink of `skills/seba-tutor` into `~/.claude/skills/`.)
 
 ## Use
 
