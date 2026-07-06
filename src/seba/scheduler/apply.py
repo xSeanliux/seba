@@ -12,7 +12,11 @@ def apply_record(state: GoalState, record: SessionRecord, now: datetime) -> Goal
     items = [
         apply_review(i, grades[i.id], now) if i.id in grades else i for i in state.items
     ]
-    items += [mint_item(m, now.date()) for m in record.new_items]
+    # Mint due-dates use the LOCAL day so a freshly minted card is due the same
+    # day the scheduler filters on (start/build_agenda use date.today(), local).
+    # now is UTC; now.date() would be tomorrow for evening sessions in UTC-behind
+    # timezones, making the card miss the next-day agenda.
+    items += [mint_item(m, now.astimezone().date()) for m in record.new_items]
 
     syllabus = state.syllabus
     for c in record.concepts:
