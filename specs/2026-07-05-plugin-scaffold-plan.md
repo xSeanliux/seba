@@ -16,32 +16,59 @@ install`, no skill symlink, no PATH fiddling. Only machine prerequisite: `uv`
 - `${CLAUDE_PLUGIN_ROOT}` (read-only bundle) and `${CLAUDE_PLUGIN_DATA}`
   (persistent, survives updates) are substituted in hook/MCP/skill-content
   contexts.
-- There is **no** `/plugin install` hook; the idiomatic setup point is a
-  **`SessionStart` hook** that runs once-per-version (diff-guarded) to prepare
-  deps.
+- **No hooks.** Dep setup is **lazy, on-demand, inside the skill** — it runs only
+  when the learner engages seba, never on unrelated `claude` sessions. `uv run`
+  auto-syncs the venv from the bundled `uv.lock` before executing, so the first
+  seba call of the first session builds deps and every later call is a fast
+  up-to-date check. No `SessionStart` hook, no per-session overhead.
 - Result: no global `seba` binary needed — the skill invokes the CLI via
-  `uv run --project <data-dir> seba …`.
+  `uv run` (see the invocation seam below).
 
-## The one real risk — validate FIRST (Phase 0 spike)
+## The invocation seam — RESOLVED by the docs (no spike needed)
 
-The open question: **when Claude follows a SKILL.md instruction and runs a Bash
-command, are `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PLUGIN_DATA}` exported into that
-shell?** Docs confirm substitution in hook/MCP *config* and in *skill content*
-(the SKILL.md text itself is substituted), but the model's ad-hoc Bash tool env
-is the unknown.
+The earlier open question was whether the plugin path vars reach the CLI call.
+The [plugins reference — Environment variables](https://code.claude.com/docs/en/plugins-reference.md#environment-variables)
+settles it:
 
-Spike (before building anything): a throwaway plugin with a skill whose SKILL.md
-says "run `echo root=${CLAUDE_PLUGIN_ROOT} data=${CLAUDE_PLUGIN_DATA}`". Install
-via `--plugin-dir`, trigger the skill, see whether the paths resolve.
+> All are substituted inline anywhere they appear in **skill content**, agent
+> content, hook commands, monitor commands, and MCP or LSP server configs. All
+> are also exported as environment variables to hook processes and MCP or LSP
+> server subprocesses.
 
-- **If skill-content substitution works** (likely): bake `${CLAUDE_PLUGIN_ROOT}`
-  into the SKILL.md command text directly — it's replaced at load time, before
-  Claude ever runs it. The command becomes a literal absolute path.
-- **If not:** the `SessionStart` hook (which *does* get the env vars) writes the
-  resolved data-dir path to a fixed file (e.g. `~/.seba/plugin-data-path`), and
-  the skill reads it. Fallback that never depends on the model's Bash env.
+Three path vars: `${CLAUDE_PLUGIN_ROOT}` (read-only bundle), `${CLAUDE_PLUGIN_DATA}`
+(persistent, for the venv — resolves to `~/.claude/plugins/data/<id>/`, created on
+first reference), `${CLAUDE_PROJECT_DIR}` (project root). Plugin `user_config`
+values also surface as `${user_config.KEY}` / `CLAUDE_PLUGIN_OPTION_<KEY>`.
 
-Everything below assumes the spike picks one of these; the rest is the same.
+**So: bake both path vars straight into the SKILL.md command text.** They
+substitute to literal absolute paths at load time, before Claude runs anything —
+no reliance on whether the var is exported into the model's ad-hoc Bash (it is
+only guaranteed for hook/MCP subprocesses, not the model's Bash). The seba call
+in the skill reads:
+
+```
+UV_PROJECT_ENVIRONMENT="${CLAUDE_PLUGIN_DATA}/venv" uv run --project "${CLAUDE_PLUGIN_ROOT}" seba …
+```
+
+- `--project "${CLAUDE_PLUGIN_ROOT}"` — run the bundled package (read-only, wiped
+  on update; fine, nothing is written there).
+- `UV_PROJECT_ENVIRONMENT="${CLAUDE_PLUGIN_DATA}/venv"` — put the venv in the
+  **persistent** data dir so it survives plugin updates and isn't rebuilt every time.
+- `uv run` auto-syncs that venv from the bundled `uv.lock` before running — the
+  lazy, on-demand bootstrap. No hook.
+
+A one-line wrapper (`bin/seba` in the bundle) can hide this so the skill just
+calls `"${CLAUDE_PLUGIN_ROOT}/bin/seba" …` with `CLAUDE_PLUGIN_DATA` passed in;
+decide during Phase 1.
+
+Optional 5-minute confirmation spike (not a blocker): a throwaway plugin loaded
+via `claude --plugin-dir ./env-test`, whose skill echoes the two vars, to eyeball
+that substitution behaves as documented.
+
+**Caveat — data separation:** uninstalling the plugin deletes `${CLAUDE_PLUGIN_DATA}`
+(unless `--keep-data`). That's fine — it only holds the venv, which `uv run`
+rebuilds on next use. The learner's `$SEBA_DATA_DIR` (`~/seba-data`) is a separate
+user-level dir and is never touched.
 
 ## Structure
 
@@ -53,8 +80,7 @@ seba/
 │   ├── plugin.json           # NEW — plugin manifest
 │   └── marketplace.json      # NEW — one-entry marketplace pointing at this repo
 ├── skills/seba-tutor/SKILL.md    # EDIT — CLI invocation (see Phase 3)
-├── hooks/
-│   └── seba-setup.sh         # NEW — diff-guarded `uv sync` into CLAUDE_PLUGIN_DATA
+├── bin/seba                  # NEW (optional) — wrapper: uv run w/ venv in PLUGIN_DATA
 ├── src/seba/ …               # bundled as-is (already here)
 ├── pyproject.toml, uv.lock   # bundled as-is
 └── Makefile, README, docs/ … # unchanged
@@ -65,42 +91,63 @@ plugin *is* the repo.
 
 ## Phases
 
-### Phase 0 — Spike the invocation seam (above). Decide root-substitution vs hook-written-path. Blocks everything.
+### Phase 0 — Optional confirmation spike (not blocking; docs already answer it)
+Load a throwaway `env-test` plugin via `claude --plugin-dir` whose skill echoes
+`${CLAUDE_PLUGIN_ROOT/DATA}` and eyeball substitution. Skip if confident.
 
-### Phase 1 — Manifest + marketplace
-- `.claude-plugin/plugin.json`: `name: seba`, `version`, `description`,
-  `skills` (points at `skills/seba-tutor`), `hooks`.
-- `.claude-plugin/marketplace.json`: single plugin entry referencing this repo.
-- Verify: `claude plugin marketplace add <local-path>` lists seba;
-  `claude plugin install` succeeds and the skill shows up.
+### Phase 1 — Manifest + marketplace (this repo *is* the plugin, monorepo)
+- `.claude-plugin/plugin.json`: minimal — `name: seba` is the only required field;
+  add `version`, `description`. `skills/` and inline/`hooks/hooks.json` hooks are
+  auto-discovered. **Components live at the plugin root, not inside
+  `.claude-plugin/`** — only `plugin.json`/`marketplace.json` go there.
+- `.claude-plugin/marketplace.json` (this repo doubles as its own marketplace),
+  modeled on caveman's:
+  ```json
+  {
+    "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+    "name": "seba",
+    "description": "…",
+    "owner": { "name": "Sean Liu", "url": "https://github.com/xSeanliux" },
+    "plugins": [{ "name": "seba", "source": "./", "category": "productivity" }]
+  }
+  ```
+  `source: "./"` → the plugin is the repo root.
+- Validate before loading: `claude plugin validate .`
+- Install path for users: `claude plugin marketplace add xSeanliux/seba && claude plugin install seba@seba`.
+- Verify: `claude plugin marketplace add <local-path>` lists seba; install succeeds; the skill shows up.
 
-### Phase 2 — Dependency bootstrap (`hooks/seba-setup.sh`, wired as a `SessionStart` hook)
-Diff-guarded so it only runs `uv sync` when the plugin version changes:
+### Phase 2 — Lazy, on-demand dependency bootstrap (NO hook)
+Bootstrap happens the first time the skill runs seba, not on session start.
+`uv run` auto-syncs the venv from the bundled `uv.lock` before executing:
 ```sh
-# pseudo — copy bundle to persistent data dir, sync once per version
-diff -q "$CLAUDE_PLUGIN_ROOT/uv.lock" "$CLAUDE_PLUGIN_DATA/uv.lock" >/dev/null 2>&1 \
-  || { cp -r "$CLAUDE_PLUGIN_ROOT"/{src,pyproject.toml,uv.lock} "$CLAUDE_PLUGIN_DATA"/ \
-       && uv sync --frozen --project "$CLAUDE_PLUGIN_DATA"; }
+UV_PROJECT_ENVIRONMENT="${CLAUDE_PLUGIN_DATA}/venv" \
+  uv run --project "${CLAUDE_PLUGIN_ROOT}" seba "$@"
 ```
-- First session builds the venv (pydantic-core Rust wheel compiles once, caches).
-- Assume `uv` is present (decision 1). A "uv not found → how to install" message
-  is a later follow-up, not v1.
-- Verify: fresh install → first session syncs; second session is a no-op.
+- Code runs from the read-only bundle; the venv lives in persistent
+  `${CLAUDE_PLUGIN_DATA}/venv` (survives plugin updates, not rebuilt each call).
+- First seba call of the first session compiles deps (pydantic-core Rust wheel,
+  once, cached); later calls are a fast uv up-to-date check.
+- **Runs only when the learner engages seba** — zero cost on unrelated `claude`
+  sessions. This is the whole reason to avoid a `SessionStart` hook.
+- Optional: wrap the above in `bin/seba` (in the bundle) so the skill line stays
+  short. Assume `uv` is present (decision 1); "uv not found" message is a later
+  follow-up.
 
 ### Phase 3 — Rework the skill's CLI invocation
-- SKILL.md currently calls a global `seba …`. Change every call to
-  `uv run --project "<DATA>" seba …` where `<DATA>` is whatever Phase 0 picked
-  (baked `${CLAUDE_PLUGIN_DATA}` or the hook-written path).
-- Keep the human-facing `seba` (via `make install`) working too — the skill's
-  invocation is the only thing that changes, and both resolve to the same CLI.
+- SKILL.md currently calls a global `seba …`. Change every call to the Phase-2
+  form (either the full `UV_PROJECT_ENVIRONMENT=… uv run --project "${CLAUDE_PLUGIN_ROOT}" seba …`
+  or `"${CLAUDE_PLUGIN_ROOT}/bin/seba" …` with `CLAUDE_PLUGIN_DATA` passed in).
+  Both `${…}` substitute at load into literal paths.
+- Keep the human-facing global `seba` (via `make install`) working too — the
+  skill's invocation is the only thing that changes; both resolve to the same CLI.
 - Verify: trigger the skill in a plugin-installed session; `seba status` / a full
   session run through the plugin path.
 
 ### Phase 4 — Learner-data separation (must not regress)
 - `$SEBA_DATA_DIR` (default `~/seba-data`) is the **learner's** data — it must
   live outside the plugin, survive plugin update/uninstall. `CLAUDE_PLUGIN_DATA`
-  holds only the venv/bundle. Confirm the setup hook never touches
-  `$SEBA_DATA_DIR`, and uninstalling the plugin leaves `~/seba-data` intact.
+  holds only the venv. Confirm nothing in the plugin touches `$SEBA_DATA_DIR`,
+  and uninstalling the plugin leaves `~/seba-data` intact.
 
 ### Phase 5 — End-to-end install test + docs
 - On a clean checkout (or a machine without a global `seba`): install via
@@ -109,9 +156,10 @@ diff -q "$CLAUDE_PLUGIN_ROOT/uv.lock" "$CLAUDE_PLUGIN_DATA/uv.lock" >/dev/null 2
   `make install` (which stays as the dev/local path).
 
 ## Decisions (resolved)
-1. **Bundle deps via `uv sync`** (not PyPI/`uvx`). Assume `uv` is always present;
-   the "uv not found" flag-and-explain message is a **later** follow-up, not v1.
-   So Phase 2 does the plain `uv sync` without the missing-`uv` guard for now.
+1. **Bundle deps, resolved lazily by `uv run`** (not PyPI/`uvx`, not a
+   `SessionStart` hook). Bootstrap runs only when the skill invokes seba. Assume
+   `uv` is always present; the "uv not found" flag-and-explain message is a
+   **later** follow-up, not v1.
 2. **Monorepo** — the plugin ships from this repo; no separate `seba-plugin` repo.
 3. **`uv` is a hard prerequisite** — documented, not auto-installed. (Auto-install
    via `curl … | sh` is out of scope.)
