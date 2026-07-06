@@ -1,0 +1,6 @@
+{
+  "name": "seba",
+  "version": "0.1.0",
+  "description": "A long-term personal tutor: spaced review plus guided teaching for your learning goals, conducted by Claude Code.",
+  "author": { "name": "Sean Liu", "url": "https://github.com/xSeanliux" }
+}

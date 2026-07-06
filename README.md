@@ -31,6 +31,22 @@ This installs the `seba` CLI (`uv tool install`) and links the `seba-tutor`
 skill into `~/.claude/skills/`. Reverse with `make uninstall` (or
 `./scripts/uninstall.sh`).
 
+## Install as a Claude Code plugin
+
+The plugin bundles the `seba` CLI and the `seba-tutor` skill, so there's no
+manual `uv tool install` or symlinking — Claude Code runs it for you. Only
+prerequisite is [`uv`](https://docs.astral.sh/uv/); the plugin resolves Python
+deps lazily on first use.
+
+```bash
+claude plugin marketplace add xSeanliux/seba
+claude plugin install seba@seba
+```
+
+Then open `claude` and ask to study (or `/seba-tutor`) — same as the local
+install, but nothing to set up. `make install` above remains the local/dev
+path; the plugin is the zero-setup path for users.
+
 ## Use
 
 From any directory, run `claude`, then ask to study — or invoke `/seba-tutor`.
