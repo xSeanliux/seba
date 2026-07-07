@@ -78,6 +78,7 @@ def build_agenda(
         teach = TeachConcept(
             id=teach_src.id,
             name=teach_src.name,
+            sources=teach_src.sources,
             source_excerpts=excerpts,
             guidance=f"estimated {teach_src.est_sessions} session(s)",
         )

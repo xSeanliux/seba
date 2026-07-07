@@ -52,15 +52,20 @@ refusal.
    - `easy` — instant and confident
    - `skipped` — only for items the session never reached
 4. **Teach** `agenda.teach_concept` (if null: review-only session). Ground the
-   lesson in its `source_excerpts` (Seba already section-sliced and size-capped
-   them for you) — teach from the source, not from memory, and if it's empty say
-   so ("no source loaded — teaching from general knowledge"). If you genuinely
-   need more, read ONE specific section of a source file (grep the heading, read a
-   bounded range) — **never read a whole source file into context; a full book
-   would blow the window.** Method: worked example → faded scaffolding →
-   independent practice, about `agenda.practice_quota` practice questions,
-   targeting ~85% learner success. Ask "why?" and "convince me" follow-ups.
-   Never dump an answer the learner could produce with one more hint.
+   lesson in the concept's sources — teach from the source, not from memory:
+   - `teach_concept.source_excerpts` holds text Seba **pre-loaded** for local-text
+     sources (already section-sliced and 16k-capped) — use it directly.
+   - `teach_concept.sources` lists **all** source locators. For any not already in
+     `source_excerpts`, fetch it yourself, but only the **bounded slice** for this
+     concept: a PDF locator like `book.pdf p.40-58` → `Read` just those pages; a
+     `https://…` locator → `WebFetch` that one page; a large local file → read the
+     named section. **Never load a whole book, PDF, or site into context.**
+   - If both are empty, say so ("no source loaded — teaching from general knowledge").
+
+   Method: worked example → faded scaffolding → independent practice, about
+   `agenda.practice_quota` practice questions, targeting ~85% learner success. Ask
+   "why?" and "convince me" follow-ups. Never dump an answer the learner could
+   produce with one more hint.
 5. Record as you go: `seba concept` for status moves (`--status started` when
    teaching begins, `completed` only when the learner demonstrates it) and for
    durable notes (misconceptions, strengths — these surface in future
@@ -75,16 +80,14 @@ refusal.
 
 ## Creating a new goal
 
-1. Interview the learner: goal, prior knowledge, primary source. For **grounded**
-   teaching, source material must be **text/markdown files** in `$SEBA_DATA_DIR/sources/`,
-   section-headed and **split into small files** (e.g. one per chapter). Seba reads
-   these as plain text — it does **not** open PDFs or fetch URLs. If the learner's
-   source is a PDF or web page, convert it to markdown first with a CLI tool (e.g.
-   `markitdown`, `pandoc`, `pdftotext`) run in the shell — **not** by reading the
-   file into this conversation — then split it into headed sections under `sources/`.
-   You only need the **table of contents** to draft the syllabus; do NOT paste or
-   read the full text (that would blow context). No source is fine too — the goal
-   just won't be source-grounded.
+1. Interview the learner: goal, prior knowledge, and the **primary source and
+   where it lives** — a local markdown/text file, a local PDF, or a URL. You only
+   need its **table of contents** to draft the syllabus; do NOT read the full text
+   now (that would blow context). Each concept's `sources` will point at the
+   specific slice for that concept (a section, a PDF page range, a URL), which you
+   fetch on demand while teaching. No source is fine too — the goal just won't be
+   source-grounded. (Local markdown placed under `$SEBA_DATA_DIR/sources/` is the
+   one Seba pre-loads as text; PDFs and URLs you resolve yourself at teach time.)
 2. **Draft the syllabus YAML yourself.** You already know the exact schema (below)
    — draft directly, do NOT read Seba's source to reverse-engineer it. The format:
 
@@ -95,10 +98,10 @@ refusal.
      - id: sample-spaces                          # kebab-case, unique across the file
        name: Sample spaces and events             # human-readable
        prereqs: []                                # list of other concept ids (may be [])
-       sources: []                                # refs to a SMALL slice of a text/markdown file under
-                                                  # $SEBA_DATA_DIR/sources/: prefer "file.md#section" when
-                                                  # the file has headings, else a small standalone file.
-                                                  # Never a whole book. Not PDFs/URLs. [] = teach from memory.
+       sources: []                                # locators for THIS concept, each a SMALL slice:
+                                                  # "blitzstein/ch01.md#1.2" (markdown under sources/, pre-loaded),
+                                                  # "algebra.pdf p.40-58" (local PDF pages), or "https://…/ch3"
+                                                  # (one web page). Never a whole book. [] = teach from memory.
        status: unseen                             # always "unseen" for a new goal
        est_sessions: 1                            # estimated sessions, 1–3
      - id: conditional-probability

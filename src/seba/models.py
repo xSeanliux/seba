@@ -69,7 +69,12 @@ class ReviewItem(BaseModel):
 class TeachConcept(BaseModel):
     id: str
     name: str
-    source_excerpts: list[str] = Field(default_factory=list)
+    sources: list[str] = Field(
+        default_factory=list
+    )  # raw locators the tutor resolves on demand
+    source_excerpts: list[str] = Field(
+        default_factory=list
+    )  # pre-loaded text for local-text sources
     guidance: str = ""
 
 
