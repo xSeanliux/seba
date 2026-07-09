@@ -100,6 +100,9 @@ def test_resolve_excerpt(tmp_path):
     assert "alpha" in resolve_excerpt(tmp_path, "blitz/ch09.md", 1000)
     assert resolve_excerpt(tmp_path, "blitz/missing.md", 1000) is None
     assert len(resolve_excerpt(tmp_path, "blitz/ch09.md", 10)) == 10
+    # a non-text file (e.g. a stray PDF) is skipped, not a crash
+    (src / "book.pdf").write_bytes(b"%PDF-1.7\x00\x80\xff binary\x00")
+    assert resolve_excerpt(tmp_path, "blitz/book.pdf", 1000) is None
 
 
 def test_deterministic(tmp_path):

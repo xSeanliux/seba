@@ -24,7 +24,10 @@ def resolve_excerpt(sources_dir: Path, ref: str, budget: int) -> str | None:
     path = sources_dir / rel
     if not path.exists():
         return None
-    text = path.read_text()
+    try:
+        text = path.read_text()
+    except (UnicodeDecodeError, OSError):
+        return None  # non-text (PDF/binary) or unreadable — skip, don't crash start
     if frag:
         sections, current = {}, None
         for line in text.splitlines():
