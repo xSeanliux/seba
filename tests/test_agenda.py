@@ -59,6 +59,19 @@ def test_teach_falls_back_to_frontier_then_none(tmp_path):
     assert build_agenda(s2, profile(), TODAY, tmp_path).teach_concept is None
 
 
+def test_teach_passes_raw_source_locators_through(tmp_path):
+    # A local markdown source is pre-loaded as text; a PDF and a URL locator
+    # can't be pre-loaded but must still reach the tutor via teach.sources.
+    (tmp_path / "blitz").mkdir()
+    (tmp_path / "blitz" / "ch01.md").write_text("# 1.1\nlocal text\n")
+    srcs = ["blitz/ch01.md#1.1", "algebra.pdf p.40-58", "https://ct.org/ch3"]
+    s = state([Concept(id="a", name="A", sources=srcs)])
+    teach = build_agenda(s, profile(), TODAY, tmp_path).teach_concept
+    assert teach.sources == srcs  # all locators carried through, verbatim
+    assert any("local text" in e for e in teach.source_excerpts)  # md pre-loaded
+    assert len(teach.source_excerpts) == 1  # pdf + url not pre-loaded, only the md
+
+
 def test_reviews_capped_by_profile(tmp_path):
     items = [item(f"it-{i}") for i in range(10)]
     s = state([Concept(id="a", name="A")], items)
