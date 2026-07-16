@@ -1,5 +1,7 @@
+import json
 from datetime import date
 from graphlib import TopologicalSorter
+from importlib.resources import files
 
 from seba.models import GoalState, Status, ViewConcept, ViewData, ViewStats
 from seba.syllabus.graph import frontier
@@ -50,3 +52,8 @@ def build_view_data(state: GoalState, today: date) -> ViewData:
         concepts=view_concepts,
         recent_grades=state.recent_grades,
     )
+
+
+def render_view(data: ViewData) -> str:
+    template = files("seba.ui").joinpath("view_template.html").read_text()
+    return template.replace("__SEBA_DATA__", json.dumps(data.model_dump(mode="json")))

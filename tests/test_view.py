@@ -1,7 +1,13 @@
+import json
 from datetime import date
 
+from typer.testing import CliRunner
+
+from seba.cli import app
 from seba.models import Concept, GoalState, Item, Syllabus
-from seba.ui.view import build_view_data
+from seba.ui.view import build_view_data, render_view
+
+runner = CliRunner()
 
 TODAY = date(2026, 7, 15)
 
@@ -59,3 +65,35 @@ def test_card_counts_and_due():
     assert (c.cards, c.due) == (3, 1)
     assert (v.stats.cards_total, v.stats.cards_due) == (3, 1)
     assert v.generated == TODAY and v.recent_grades == ["good", "again"]
+
+
+def test_render_view_injects_data():
+    v = build_view_data(state([Concept(id="a", name="A")]), TODAY)
+    html = render_view(v)
+    assert "__SEBA_DATA__" not in html
+    assert '"goal": "prob"' in html
+    assert "<script" in html and "http" not in html.split("<script")[0].lower().replace(
+        "http-equiv", ""
+    )  # no external URLs before the data script (self-contained head)
+
+
+def test_view_cli(monkeypatch, tmp_path):
+    monkeypatch.setenv("SEBA_DATA_DIR", str(tmp_path / "data"))
+    from seba.models import Syllabus as _S  # local alias to build a real goal
+    from seba.store.store import Store
+
+    Store(tmp_path / "data").create_goal(
+        "prob",
+        _S(goal="prob", subject="probability", concepts=[Concept(id="a", name="A")]),
+        "probability",
+    )
+    result = runner.invoke(app, ["view", "prob", "--json"])
+    assert result.exit_code == 0
+    blob = json.loads(result.output)
+    assert blob["stats"]["concepts_total"] == 1
+
+    result2 = runner.invoke(app, ["view", "prob"])
+    assert result2.exit_code == 0
+    out = tmp_path / "data" / "goals" / "prob" / "view.html"
+    assert out.exists() and str(out) in result2.output
+    assert '"concepts_total": 1' in out.read_text()
