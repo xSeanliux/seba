@@ -56,4 +56,7 @@ def build_view_data(state: GoalState, today: date) -> ViewData:
 
 def render_view(data: ViewData) -> str:
     template = files("seba.ui").joinpath("view_template.html").read_text()
-    return template.replace("__SEBA_DATA__", json.dumps(data.model_dump(mode="json")))
+    # json.dumps doesn't escape "/", so a name containing "</script>" would
+    # close the data <script> block early and silently blank the page.
+    blob = json.dumps(data.model_dump(mode="json")).replace("</", "<\\/")
+    return template.replace("__SEBA_DATA__", blob)

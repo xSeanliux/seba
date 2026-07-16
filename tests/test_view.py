@@ -77,6 +77,15 @@ def test_render_view_injects_data():
     )  # no external URLs before the data script (self-contained head)
 
 
+def test_render_view_escapes_script_breakout():
+    v = build_view_data(state([Concept(id="a", name="tricky </script> name")]), TODAY)
+    html = render_view(v)
+    # only the template's own closing tag may appear; the data blob must not
+    # be able to terminate the <script> block early (silent blank page)
+    assert html.count("</script>") == 1
+    assert "tricky <\\/script> name" in html
+
+
 def test_view_cli(monkeypatch, tmp_path):
     monkeypatch.setenv("SEBA_DATA_DIR", str(tmp_path / "data"))
     from seba.models import Syllabus as _S  # local alias to build a real goal
