@@ -71,7 +71,7 @@ is the exception).
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session |
 | `seba abandon GOAL [--discard]` | quit early: save as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a drafted syllabus YAML |
-| `seba view GOAL [--open]` | render the goal's dependency graph + card status to HTML; `--open` shows it in the browser |
+| `seba view GOAL [--json] [--open]` | render the goal's dependency graph + card status to HTML; `--json` prints the data blob instead, `--open` shows it in the browser |
 
 ## Data directory layout
 

@@ -23,7 +23,7 @@ record does not exist next session.
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session (refuses while reviews are ungraded) |
 | `seba abandon GOAL [--discard]` | learner quits early: save what was recorded as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a syllabus YAML you drafted |
-| `seba view GOAL [--open]` | render the goal's dependency graph + card status to HTML; `--open` shows it in the browser |
+| `seba view GOAL [--json] [--open]` | render the goal's dependency graph + card status to HTML; `--json` prints the data blob instead, `--open` shows it in the browser |
 
 Any command that fails prints the reason and exits non-zero — read the message,
 fix the call (e.g. grade the listed items), and retry. Never work around a
