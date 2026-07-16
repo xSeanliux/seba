@@ -6,13 +6,18 @@
 <title>seba — goal view</title>
 <style>
   body { font: 14px/1.5 -apple-system, system-ui, sans-serif; color: #0f172a;
-         background: #fff; max-width: 1040px; margin: 2rem auto; padding: 0 1rem; }
-  h1 { margin: 0 0 .25rem; font-size: 1.4rem; }
-  #stats { color: #475569; margin: 0 0 .5rem; }
-  .legend { color: #475569; font-size: 12px; margin-bottom: 1.25rem; }
+         background: #f8fafc; max-width: 1040px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { margin: 0 0 .25rem; font-size: 1.45rem; letter-spacing: -.01em; }
+  #stats { color: #475569; margin: 0 0 .6rem; }
+  #bar { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden;
+         max-width: 420px; margin: 0 0 .75rem; }
+  #bar i { display: block; height: 100%; background: #22c55e; border-radius: 3px; }
+  .legend { color: #475569; font-size: 12px; margin: 0 0 1rem; }
   .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px;
               margin: 0 4px 0 12px; vertical-align: -1px; border: 1px solid #64748b; }
-  #graphwrap { overflow-x: auto; margin-bottom: 2rem; }
+  #graphwrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+               padding: 12px; margin-bottom: 2rem; }
+  #graph { display: block; margin: 0 auto; height: auto; }
   table { border-collapse: collapse; width: 100%; }
   th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e2e8f0; }
   th { color: #475569; font-weight: 600; }
@@ -22,6 +27,7 @@
 <body>
 <h1 id="title"></h1>
 <p id="stats"></p>
+<div id="bar"><i></i></div>
 <p class="legend">status:
   <i style="background:#e2e8f0"></i>unseen
   <i style="background:#fde68a"></i>in-progress
@@ -45,23 +51,33 @@ document.getElementById("stats").textContent =
   `session ${DATA.session_number} · concepts ${S.concepts_done}/${S.concepts_total} done · ` +
   `cards ${S.cards_total} (${S.cards_due} due today) · frontier: ${S.frontier.join(", ") || "none"}`;
 
-// ---- layered dependency graph ----
+document.querySelector("#bar i").style.width =
+  S.concepts_total ? `${(100 * S.concepts_done / S.concepts_total).toFixed(1)}%` : "0";
+
+// ---- layered dependency graph: layers flow DOWN, scaled to fit the page ----
 const svg = document.getElementById("graph");
 const NS = "http://www.w3.org/2000/svg";
-const W = 200, H = 46, XGAP = 80, YGAP = 24, PAD = 24;
+const W = 190, H = 52, XGAP = 28, YGAP = 58, PAD = 16;
 const layers = new Map();
 for (const c of DATA.concepts) {
   if (!layers.has(c.layer)) layers.set(c.layer, []);
-  c._row = layers.get(c.layer).length;
+  c._col = layers.get(c.layer).length;
   layers.get(c.layer).push(c);
 }
+const maxPerLayer = Math.max(1, ...[...layers.values()].map(l => l.length));
+const rowW = maxPerLayer * W + (maxPerLayer - 1) * XGAP;
+const nLayers = Math.max(0, ...DATA.concepts.map(c => c.layer)) + 1;
+const totalW = PAD * 2 + rowW;
+const totalH = PAD * 2 + nLayers * H + (nLayers - 1) * YGAP;
 const pos = new Map();
-for (const c of DATA.concepts)
-  pos.set(c.id, { x: PAD + c.layer * (W + XGAP), y: PAD + c._row * (H + YGAP) });
-const maxLayer = Math.max(0, ...DATA.concepts.map(c => c.layer));
-const maxRows = Math.max(1, ...[...layers.values()].map(l => l.length));
-svg.setAttribute("width", PAD * 2 + (maxLayer + 1) * W + maxLayer * XGAP);
-svg.setAttribute("height", PAD * 2 + maxRows * (H + YGAP));
+for (const [ln, list] of layers) {                 // center each layer's row
+  const lw = list.length * W + (list.length - 1) * XGAP;
+  const x0 = PAD + (rowW - lw) / 2;
+  list.forEach((c, i) =>
+    pos.set(c.id, { x: x0 + i * (W + XGAP), y: PAD + ln * (H + YGAP) }));
+}
+svg.setAttribute("viewBox", `0 0 ${totalW} ${totalH}`);  // scale down, never scroll
+svg.style.width = `min(100%, ${totalW}px)`;              // ...and never upscale
 
 function el(tag, attrs, parent) {
   const e = document.createElementNS(NS, tag);
@@ -69,25 +85,48 @@ function el(tag, attrs, parent) {
   (parent || svg).appendChild(e);
   return e;
 }
-for (const c of DATA.concepts)                    // edges first, under the nodes
+const defs = el("defs", {});
+el("marker", { id: "arr", viewBox: "0 0 10 10", refX: 8, refY: 5,
+               markerWidth: 5.5, markerHeight: 5.5, orient: "auto-start-reverse" }, defs);
+el("path", { d: "M0,0 L10,5 L0,10 z", fill: "#a5b4cb" }, defs.firstChild);
+const sh = el("filter", { id: "sh", x: "-20%", y: "-20%", width: "140%", height: "140%" }, defs);
+el("feDropShadow", { dx: 0, dy: 1, stdDeviation: 1.4,
+                     "flood-color": "#0f172a", "flood-opacity": 0.16 }, sh);
+
+const edgesByNode = new Map();                     // node id -> its edge paths
+for (const c of DATA.concepts)                     // edges first, under the nodes
   for (const p of c.prereqs) {
     const a = pos.get(p), b = pos.get(c.id);
     if (!a || !b) continue;
-    const x1 = a.x + W, y1 = a.y + H / 2, x2 = b.x, y2 = b.y + H / 2;
-    el("path", { d: `M${x1},${y1} C${x1 + XGAP / 2},${y1} ${x2 - XGAP / 2},${y2} ${x2},${y2}`,
-                 fill: "none", stroke: "#94a3b8", "stroke-width": 1.5 });
+    const x1 = a.x + W / 2, y1 = a.y + H, x2 = b.x + W / 2, y2 = b.y;
+    const path = el("path", {
+      d: `M${x1},${y1} C${x1},${y1 + YGAP / 2} ${x2},${y2 - YGAP / 2} ${x2},${y2 - 4}`,
+      fill: "none", stroke: "#cbd5e1", "stroke-width": 1.5, "marker-end": "url(#arr)",
+    });
+    for (const id of [p, c.id])
+      edgesByNode.set(id, [...(edgesByNode.get(id) || []), path]);
   }
 for (const c of DATA.concepts) {
   const { x, y } = pos.get(c.id);
   const onFrontier = S.frontier.includes(c.id);
-  const g = el("g", {});
-  el("rect", { x, y, width: W, height: H, rx: 8, fill: COLORS[c.status] || "#e2e8f0",
-               stroke: onFrontier ? "#2563eb" : "#64748b",
-               "stroke-width": onFrontier ? 2.5 : 1 }, g);
-  const t1 = el("text", { x: x + 10, y: y + 19, "font-size": 12, "font-weight": 600 }, g);
-  t1.textContent = c.name.length > 26 ? c.name.slice(0, 25) + "…" : c.name;
-  const t2 = el("text", { x: x + 10, y: y + 36, "font-size": 11, fill: "#475569" }, g);
-  t2.textContent = `${c.id} · ${c.cards} cards` + (c.due ? ` · ${c.due} due` : "");
+  const g = el("g", { style: "cursor: default" });
+  el("rect", { x, y, width: W, height: H, rx: 10, fill: COLORS[c.status] || "#e2e8f0",
+               stroke: onFrontier ? "#2563eb" : "#94a3b8",
+               "stroke-width": onFrontier ? 2.5 : 1, filter: "url(#sh)" }, g);
+  const check = c.status === "done" ? "✓ " : "";
+  const t1 = el("text", { x: x + 12, y: y + 21, "font-size": 12.5, "font-weight": 600 }, g);
+  t1.textContent = check + (c.name.length > 25 ? c.name.slice(0, 24) + "…" : c.name);
+  const t2 = el("text", { x: x + 12, y: y + 39, "font-size": 11, fill: "#475569" }, g);
+  t2.textContent = `${c.cards} card${c.cards === 1 ? "" : "s"}` +
+    (c.due ? ` · ${c.due} due` : "") + ` · ~${c.est_sessions} session${c.est_sessions === 1 ? "" : "s"}`;
+  const paint = (stroke, width) => () => {
+    for (const pth of edgesByNode.get(c.id) || []) {
+      pth.setAttribute("stroke", stroke);
+      pth.setAttribute("stroke-width", width);
+    }
+  };
+  g.addEventListener("mouseenter", paint("#2563eb", 2.5));
+  g.addEventListener("mouseleave", paint("#cbd5e1", 1.5));
 }
 
 // ---- per-concept table ----
