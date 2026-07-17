@@ -144,6 +144,19 @@ def test_buckets_forecast_next_due():
     assert c.next_due == date(2020, 1, 1)  # earliest across cards
 
 
+def test_deck_carries_card_contents():
+    items = [
+        item("it-1", "a"),  # front="f", back="b", stability absent -> fragile
+        item("it-2", "a", suspended=True),
+    ]
+    v = build_view_data(state([Concept(id="a", name="A")], items), TODAY)
+    [c] = v.concepts
+    assert len(c.deck) == 2
+    assert (c.deck[0].front, c.deck[0].back, c.deck[0].type) == ("f", "b", "recall")
+    assert c.deck[0].bucket == "fragile" and c.deck[0].due == date(2020, 1, 1)
+    assert c.deck[1].bucket == "suspended"
+
+
 def test_render_view_injects_data():
     v = build_view_data(state([Concept(id="a", name="A")]), TODAY)
     html = render_view(v)

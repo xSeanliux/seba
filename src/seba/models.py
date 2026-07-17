@@ -168,6 +168,14 @@ class PendingSession(BaseModel):
     started: date
 
 
+class ViewCard(BaseModel):
+    type: ItemType
+    front: str
+    back: str
+    due: date | None = None
+    bucket: str  # solid | fragile | rebuilding | suspended
+
+
 class ViewConcept(BaseModel):
     id: str
     name: str
@@ -179,6 +187,7 @@ class ViewConcept(BaseModel):
     est_sessions: int
     note: str | None = None  # latest tutor note for this concept
     next_due: date | None = None  # earliest due date among its cards
+    deck: list[ViewCard] = Field(default_factory=list)  # for the node inspector
 
 
 class ViewStats(BaseModel):

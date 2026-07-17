@@ -43,6 +43,25 @@
   td.note { color: #475569; max-width: 420px; }
   td.dt { white-space: nowrap; font-variant-numeric: tabular-nums; }
   #generated { color: #94a3b8; font-size: 12px; margin-top: 1.25rem; }
+  #inspector { border-top: 1px solid #e2e8f0; margin-top: 12px; padding-top: 12px; }
+  #inspector .ihead { display: flex; align-items: baseline; gap: 10px; }
+  #inspector h3 { margin: 0; font-size: 15px; }
+  #inspector .ihead .close { margin-left: auto; border: none; background: none;
+      color: #64748b; font-size: 16px; cursor: pointer; padding: 2px 6px; }
+  #inspector .inote { color: #475569; font-size: 13px; margin: .4rem 0 .6rem; }
+  #inspector details { border: 1px solid #e2e8f0; border-radius: 8px;
+      padding: 8px 12px; margin: 6px 0; background: #fbfcfe; }
+  #inspector summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+  #inspector summary::marker { color: #94a3b8; }
+  #inspector details p { margin: .5rem 0 0; color: #334155; font-size: 13px;
+      white-space: pre-wrap; }
+  .chip { display: inline-block; font-size: 10.5px; font-weight: 600; border-radius: 99px;
+      padding: 1px 8px; margin-left: 6px; vertical-align: 1px; color: #334155;
+      background: #e2e8f0; }
+  .chip.solid { background: #dcfce7; color: #166534; }
+  .chip.fragile { background: #fef3c7; color: #92400e; }
+  .chip.rebuilding { background: #fee2e2; color: #991b1b; }
+  .chip.suspended { background: #e2e8f0; color: #475569; }
 </style>
 </head>
 <body>
@@ -75,7 +94,8 @@
 <div class="panel">
   <h2>Concept map</h2>
   <div id="graphwrap"><svg id="graph"></svg></div>
-  <p class="legend">status:
+  <div id="inspector" hidden></div>
+  <p class="legend">click a concept to inspect its cards · status:
     <i style="background:#e2e8f0"></i>unseen
     <i style="background:#fde68a"></i>in-progress
     <i style="background:#86efac"></i>done
@@ -248,13 +268,88 @@ for (const c of DATA.concepts)                     // edges first, under the nod
     for (const id of [p, c.id])
       edgesByNode.set(id, [...(edgesByNode.get(id) || []), path]);
   }
+// ---- node inspector (click a concept to see its cards) ----
+const inspector = document.getElementById("inspector");
+let selected = null;                                // {id, rect, stroke, width}
+function closeInspector() {
+  if (selected) {
+    selected.rect.setAttribute("stroke", selected.stroke);
+    selected.rect.setAttribute("stroke-width", selected.width);
+  }
+  selected = null;
+  inspector.hidden = true;
+  inspector.replaceChildren();
+}
+function openInspector(c, rect, baseStroke, baseWidth) {
+  if (selected && selected.id === c.id) { closeInspector(); return; }
+  closeInspector();
+  selected = { id: c.id, rect, stroke: baseStroke, width: baseWidth };
+  rect.setAttribute("stroke", "#1d4ed8");
+  rect.setAttribute("stroke-width", 3);
+
+  const head = document.createElement("div");
+  head.className = "ihead";
+  const h3 = document.createElement("h3");
+  h3.textContent = c.name;
+  const chip = document.createElement("span");
+  chip.className = "chip";
+  chip.textContent = c.status;
+  const close = document.createElement("button");
+  close.className = "close";
+  close.textContent = "×";
+  close.setAttribute("aria-label", "close inspector");
+  close.addEventListener("click", closeInspector);
+  head.append(h3, chip, close);
+  inspector.appendChild(head);
+
+  if (c.note) {
+    const p = document.createElement("p");
+    p.className = "inote";
+    p.textContent = c.note;
+    inspector.appendChild(p);
+  }
+  if (!c.deck.length) {
+    const p = document.createElement("p");
+    p.className = "inote";
+    p.textContent = c.status === "done"
+      ? "No retention cards yet — nothing scheduled against forgetting this."
+      : "No cards yet — they get minted while this concept is taught.";
+    inspector.appendChild(p);
+  }
+  for (const card of c.deck) {
+    const d = document.createElement("details");
+    const sum = document.createElement("summary");
+    sum.textContent = card.front;
+    for (const [cls, label] of [
+      ["", card.type],
+      [card.bucket, card.bucket],
+      ["", card.due ? (card.due <= DATA.generated ? "due today" : `due ${card.due}`) : ""],
+    ]) {
+      if (!label) continue;
+      const ch = document.createElement("span");
+      ch.className = "chip" + (cls ? ` ${cls}` : "");
+      ch.textContent = label;
+      sum.appendChild(ch);
+    }
+    const back = document.createElement("p");
+    back.textContent = card.back;
+    d.append(sum, back);
+    inspector.appendChild(d);
+  }
+  inspector.hidden = false;
+}
+
 for (const c of DATA.concepts) {
   const { x, y } = pos.get(c.id);
   const onFrontier = S.frontier.includes(c.id);
-  const g = el("g", { style: "cursor: default" });
-  el("rect", { x, y, width: W, height: H, rx: 10, fill: COLORS[c.status] || "#e2e8f0",
-               stroke: onFrontier ? "#2563eb" : "#94a3b8",
-               "stroke-width": onFrontier ? 2.5 : 1, filter: "url(#sh)" }, g);
+  const baseStroke = onFrontier ? "#2563eb" : "#94a3b8";
+  const baseWidth = onFrontier ? 2.5 : 1;
+  const g = el("g", { style: "cursor: pointer" });
+  const rect = el("rect", { x, y, width: W, height: H, rx: 10,
+               fill: COLORS[c.status] || "#e2e8f0",
+               stroke: baseStroke,
+               "stroke-width": baseWidth, filter: "url(#sh)" }, g);
+  g.addEventListener("click", () => openInspector(c, rect, baseStroke, baseWidth));
   const check = c.status === "done" ? "✓ " : "";
   const t1 = el("text", { x: x + 12, y: y + 20, "font-size": 12.5, "font-weight": 600 }, g);
   t1.textContent = check + (c.name.length > 25 ? c.name.slice(0, 24) + "…" : c.name);

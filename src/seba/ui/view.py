@@ -8,6 +8,7 @@ from seba.models import (
     ForecastDay,
     GoalState,
     Status,
+    ViewCard,
     ViewConcept,
     ViewData,
     ViewStats,
@@ -74,6 +75,16 @@ def build_view_data(state: GoalState, today: date) -> ViewData:
         due_dates = [
             d for i in cards if not i.suspended and (d := _due_date(i)) is not None
         ]
+        deck = [
+            ViewCard(
+                type=i.type,
+                front=i.front,
+                back=i.back,
+                due=_due_date(i),
+                bucket="suspended" if i.suspended else _bucket(i),
+            )
+            for i in cards
+        ]
         view_concepts.append(
             ViewConcept(
                 id=c.id,
@@ -86,6 +97,7 @@ def build_view_data(state: GoalState, today: date) -> ViewData:
                 est_sessions=c.est_sessions,
                 note=latest[0] if latest else None,
                 next_due=min(due_dates) if due_dates else None,
+                deck=deck,
             )
         )
     watch_candidates.sort(key=lambda t: t[0], reverse=True)  # freshest session first
