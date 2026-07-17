@@ -8,51 +8,181 @@
   body { font: 14px/1.5 -apple-system, system-ui, sans-serif; color: #0f172a;
          background: #f8fafc; max-width: 1040px; margin: 2rem auto; padding: 0 1rem; }
   h1 { margin: 0 0 .25rem; font-size: 1.45rem; letter-spacing: -.01em; }
-  #stats { color: #475569; margin: 0 0 .6rem; }
-  #bar { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden;
-         max-width: 420px; margin: 0 0 .75rem; }
-  #bar i { display: block; height: 100%; background: #22c55e; border-radius: 3px; }
-  .legend { color: #475569; font-size: 12px; margin: 0 0 1rem; }
+  h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
+       color: #64748b; margin: 0 0 .5rem; }
+  #stats { color: #475569; margin: 0 0 1.1rem; }
+  .panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+           padding: 14px 16px; margin-bottom: 14px; }
+  #cta { border-left: 4px solid #2563eb; }
+  #cta .lead { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
+               color: #2563eb; font-weight: 700; margin: 0 0 .3rem; }
+  #cta .hint { font-size: 15px; margin: 0 0 .35rem; }
+  #cta .meta { color: #475569; font-size: 12.5px; margin: 0; }
+  #watch ul { margin: 0; padding: 0; list-style: none; }
+  #watch li { margin: .35rem 0; display: grid; grid-template-columns: auto 1fr; gap: 8px; }
+  #watch b { font-weight: 600; white-space: nowrap; }
+  #watch span { color: #475569; display: -webkit-box; -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical; overflow: hidden; }
+  #sigrow { display: flex; flex-wrap: wrap; gap: 14px; }
+  #sigrow .panel { flex: 1; min-width: 240px; margin-bottom: 0; }
+  #sigrow { margin-bottom: 14px; }
+  .signum { color: #475569; font-size: 13px; margin: .2rem 0 0; }
+  #pips { display: flex; gap: 3px; margin-top: .55rem; }
+  #pips i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  #forecast svg { display: block; margin-top: .4rem; }
+  .legend { color: #475569; font-size: 12px; margin: .6rem 0 0; }
   .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px;
               margin: 0 4px 0 12px; vertical-align: -1px; border: 1px solid #64748b; }
-  #graphwrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
-               padding: 12px; margin-bottom: 2rem; }
+  #graphwrap { overflow-x: auto; }
   #graph { display: block; margin: 0 auto; height: auto; }
-  table { border-collapse: collapse; width: 100%; }
-  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e2e8f0; }
-  th { color: #475569; font-weight: 600; }
-  #generated { color: #94a3b8; font-size: 12px; margin-top: 1.5rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #e2e8f0;
+           vertical-align: top; }
+  th { color: #64748b; font-weight: 600; font-size: 11px; text-transform: uppercase;
+       letter-spacing: .06em; }
+  td.note { color: #475569; max-width: 420px; }
+  td.dt { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #generated { color: #94a3b8; font-size: 12px; margin-top: 1.25rem; }
 </style>
 </head>
 <body>
 <h1 id="title"></h1>
 <p id="stats"></p>
-<div id="bar"><i></i></div>
-<p class="legend">status:
-  <i style="background:#e2e8f0"></i>unseen
-  <i style="background:#fde68a"></i>in-progress
-  <i style="background:#86efac"></i>done
-  <i style="background:#fff;border-color:#2563eb;border-width:2px"></i>frontier
-</p>
-<div id="graphwrap"><svg id="graph"></svg></div>
-<table id="cards">
-  <thead><tr><th>concept</th><th>status</th><th>est. sessions</th><th>cards</th><th>due</th></tr></thead>
-  <tbody></tbody>
-</table>
+
+<div id="cta" class="panel" hidden>
+  <p class="lead">Pick up here →</p>
+  <p class="hint"></p>
+  <p class="meta"></p>
+</div>
+
+<div id="watch" class="panel" hidden>
+  <h2>Still firming up</h2>
+  <ul></ul>
+</div>
+
+<div id="sigrow">
+  <div class="panel">
+    <h2>Memory</h2>
+    <p class="signum" id="buckets"></p>
+    <div id="pips"></div>
+  </div>
+  <div class="panel" id="forecast">
+    <h2>Coming due — next 14 days</h2>
+    <p class="signum" id="fsummary"></p>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Concept map</h2>
+  <div id="graphwrap"><svg id="graph"></svg></div>
+  <p class="legend">status:
+    <i style="background:#e2e8f0"></i>unseen
+    <i style="background:#fde68a"></i>in-progress
+    <i style="background:#86efac"></i>done
+    <i style="background:#fff;border-color:#2563eb;border-width:2px"></i>frontier
+  </p>
+</div>
+
+<div class="panel">
+  <h2>Concept notes</h2>
+  <table id="cards">
+    <thead><tr><th>concept</th><th>status</th><th>next due</th><th>latest note</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
 <p id="generated"></p>
+
 <script>
 const DATA = __SEBA_DATA__;
 const COLORS = { "unseen": "#e2e8f0", "in-progress": "#fde68a", "done": "#86efac" };
+const GRADE_COLORS = { again: "#ef4444", hard: "#f59e0b", good: "#22c55e", easy: "#3b82f6", skipped: "#cbd5e1" };
+const S = DATA.stats;
+const byId = new Map(DATA.concepts.map(c => [c.id, c]));
 
 document.title = `seba — ${DATA.goal}`;
 document.getElementById("title").textContent = `${DATA.goal} (${DATA.subject})`;
-const S = DATA.stats;
 document.getElementById("stats").textContent =
-  `session ${DATA.session_number} · concepts ${S.concepts_done}/${S.concepts_total} done · ` +
-  `cards ${S.cards_total} (${S.cards_due} due today) · frontier: ${S.frontier.join(", ") || "none"}`;
+  `Session ${DATA.session_number} · ${S.concepts_done} of ${S.concepts_total} concepts done · ` +
+  `${S.cards_total} cards (${S.cards_due} due today)`;
 
-document.querySelector("#bar i").style.width =
-  S.concepts_total ? `${(100 * S.concepts_done / S.concepts_total).toFixed(1)}%` : "0";
+// ---- pick up here ----
+const frontierNames = S.frontier.map(id => (byId.get(id) || { name: id }).name);
+const cta = document.getElementById("cta");
+cta.hidden = false;
+cta.querySelector(".hint").textContent =
+  DATA.next_hint || (frontierNames.length ? `Next up: ${frontierNames.join(", ")}` : "All concepts done — review only.");
+cta.querySelector(".meta").textContent =
+  `${S.cards_due} card${S.cards_due === 1 ? "" : "s"} due today` +
+  (DATA.next_hint && frontierNames.length ? ` · on the map: ${frontierNames.join(", ")}` : "") +
+  ` · start by telling seba: "continue ${DATA.goal}"`;
+
+// ---- still firming up ----
+if (DATA.watch.length) {
+  const w = document.getElementById("watch");
+  w.hidden = false;
+  const ul = w.querySelector("ul");
+  for (const it of DATA.watch) {
+    const li = document.createElement("li");
+    const b = document.createElement("b");
+    b.textContent = it.name;
+    const span = document.createElement("span");
+    span.textContent = it.note;
+    li.append(b, span);
+    ul.appendChild(li);
+  }
+}
+
+// ---- memory buckets + grade pips ----
+const parts = [];
+if (S.solid) parts.push(`${S.solid} solid (weeks of hold)`);
+if (S.fragile) parts.push(`${S.fragile} still fragile`);
+if (S.rebuilding) parts.push(`${S.rebuilding} lapsed, rebuilding`);
+document.getElementById("buckets").textContent =
+  parts.length ? parts.join(" · ") : "No retention cards yet.";
+const pips = document.getElementById("pips");
+const grades = DATA.recent_grades.slice(-15);
+grades.forEach((g, i) => {
+  const el2 = document.createElement("i");
+  el2.style.background = GRADE_COLORS[g] || "#cbd5e1";
+  el2.style.opacity = (0.4 + 0.6 * (i + 1) / grades.length).toFixed(2);
+  el2.title = g;
+  pips.appendChild(el2);
+});
+
+// ---- due forecast strip ----
+const F = DATA.forecast;
+const week = F.slice(0, 7).reduce((a, d) => a + d.count, 0);
+document.getElementById("fsummary").textContent =
+  week ? `${F[0].count} now, ${week - F[0].count} more this week — about ${week <= 6 ? "one session's" : "two sessions'"} worth.`
+       : "Nothing due in the next two weeks.";
+if (F.length) {
+  const NSF = "http://www.w3.org/2000/svg";
+  const fsvg = document.createElementNS(NSF, "svg");
+  const bw = 11, gap = 4, fh = 42;
+  fsvg.setAttribute("width", F.length * (bw + gap));
+  fsvg.setAttribute("height", fh + 14);
+  const maxC = Math.max(1, ...F.map(d => d.count));
+  F.forEach((d, i) => {
+    const h = d.count ? Math.max(3, (fh - 4) * d.count / maxC) : 1.5;
+    const r = document.createElementNS(NSF, "rect");
+    r.setAttribute("x", i * (bw + gap));
+    r.setAttribute("y", fh - h);
+    r.setAttribute("width", bw);
+    r.setAttribute("height", h);
+    r.setAttribute("rx", 2);
+    r.setAttribute("fill", i === 0 ? "#2563eb" : d.count ? "#94a3b8" : "#e2e8f0");
+    const t = document.createElementNS(NSF, "title");
+    t.textContent = `${d.date}: ${d.count} due`;
+    r.appendChild(t);
+    fsvg.appendChild(r);
+  });
+  const lbl = document.createElementNS(NSF, "text");
+  lbl.setAttribute("x", 0); lbl.setAttribute("y", fh + 12);
+  lbl.setAttribute("font-size", 10); lbl.setAttribute("fill", "#94a3b8");
+  lbl.textContent = "today →";
+  fsvg.appendChild(lbl);
+  document.getElementById("forecast").appendChild(fsvg);
+}
 
 // ---- layered dependency graph: layers flow DOWN, scaled to fit the page ----
 const svg = document.getElementById("graph");
@@ -76,8 +206,9 @@ for (const [ln, list] of layers) {                 // center each layer's row
   list.forEach((c, i) =>
     pos.set(c.id, { x: x0 + i * (W + XGAP), y: PAD + ln * (H + YGAP) }));
 }
-svg.setAttribute("viewBox", `0 0 ${totalW} ${totalH}`);  // scale down, never scroll
+svg.setAttribute("viewBox", `0 0 ${totalW} ${totalH}`);  // scale down, don't scroll
 svg.style.width = `min(100%, ${totalW}px)`;              // ...and never upscale
+svg.style.minWidth = `${Math.min(totalW, 640)}px`;       // floor: text stays legible
 
 function el(tag, attrs, parent) {
   const e = document.createElementNS(NS, tag);
@@ -93,16 +224,27 @@ const sh = el("filter", { id: "sh", x: "-20%", y: "-20%", width: "140%", height:
 el("feDropShadow", { dx: 0, dy: 1, stdDeviation: 1.4,
                      "flood-color": "#0f172a", "flood-opacity": 0.16 }, sh);
 
-const edgesByNode = new Map();                     // node id -> its edge paths
+// edge semantics: settled (climbed), active (unlocking the frontier), locked (not yet)
+const unlocked = c => c.prereqs.every(p => (byId.get(p) || {}).status === "done");
+const edgesByNode = new Map();
 for (const c of DATA.concepts)                     // edges first, under the nodes
   for (const p of c.prereqs) {
     const a = pos.get(p), b = pos.get(c.id);
     if (!a || !b) continue;
+    const pa = byId.get(p);
+    let stroke = "#cbd5e1", width = 1.5, dash = "4 3";        // locked/future
+    if (pa.status === "done" && c.status === "done") {
+      stroke = "#e2e8f0"; width = 1; dash = "";               // settled scaffold
+    } else if (pa.status === "done" && unlocked(c)) {
+      stroke = "#2563eb"; width = 2; dash = "";               // live edge
+    }
     const x1 = a.x + W / 2, y1 = a.y + H, x2 = b.x + W / 2, y2 = b.y;
     const path = el("path", {
       d: `M${x1},${y1} C${x1},${y1 + YGAP / 2} ${x2},${y2 - YGAP / 2} ${x2},${y2 - 4}`,
-      fill: "none", stroke: "#cbd5e1", "stroke-width": 1.5, "marker-end": "url(#arr)",
+      fill: "none", stroke, "stroke-width": width, "marker-end": "url(#arr)",
     });
+    if (dash) path.setAttribute("stroke-dasharray", dash);
+    path.dataset.s = stroke; path.dataset.w = width;
     for (const id of [p, c.id])
       edgesByNode.set(id, [...(edgesByNode.get(id) || []), path]);
   }
@@ -114,34 +256,58 @@ for (const c of DATA.concepts) {
                stroke: onFrontier ? "#2563eb" : "#94a3b8",
                "stroke-width": onFrontier ? 2.5 : 1, filter: "url(#sh)" }, g);
   const check = c.status === "done" ? "✓ " : "";
-  const t1 = el("text", { x: x + 12, y: y + 21, "font-size": 12.5, "font-weight": 600 }, g);
+  const t1 = el("text", { x: x + 12, y: y + 20, "font-size": 12.5, "font-weight": 600 }, g);
   t1.textContent = check + (c.name.length > 25 ? c.name.slice(0, 24) + "…" : c.name);
-  const t2 = el("text", { x: x + 12, y: y + 39, "font-size": 11, fill: "#475569" }, g);
-  t2.textContent = `${c.cards} card${c.cards === 1 ? "" : "s"}` +
-    (c.due ? ` · ${c.due} due` : "") + ` · ~${c.est_sessions} session${c.est_sessions === 1 ? "" : "s"}`;
-  const paint = (stroke, width) => () => {
+  const t2 = el("text", { x: x + 12, y: y + 36, "font-size": 11, fill: "#475569" }, g);
+  t2.textContent = c.cards
+    ? `${c.cards} card${c.cards === 1 ? "" : "s"}` + (c.due ? ` · ${c.due} due` : "")
+    : (c.status === "done" ? "done — no retention cards" : `~${c.est_sessions} session${c.est_sessions === 1 ? "" : "s"}`);
+  if (c.cards) {                                    // due vs scheduled split bar
+    const bw2 = W - 24, bx = x + 12, by = y + H - 9;
+    el("rect", { x: bx, y: by, width: bw2, height: 3.5, rx: 1.75,
+                 fill: "rgba(255,255,255,.6)" }, g);
+    const dueW = bw2 * (c.due / c.cards);
+    if (c.due) el("rect", { x: bx, y: by, width: dueW, height: 3.5, rx: 1.75,
+                            fill: "#d97706" }, g);
+  }
+  if (c.note) {                                     // open watch-item badge
+    el("circle", { cx: x + W - 11, cy: y + 11, r: 7, fill: "#d97706" }, g);
+    const bang = el("text", { x: x + W - 11, y: y + 14.5, "font-size": 10,
+                              "font-weight": 700, fill: "#fff",
+                              "text-anchor": "middle" }, g);
+    bang.textContent = "!";
+  }
+  const paint = (on) => () => {
     for (const pth of edgesByNode.get(c.id) || []) {
-      pth.setAttribute("stroke", stroke);
-      pth.setAttribute("stroke-width", width);
+      pth.setAttribute("stroke", on ? "#2563eb" : pth.dataset.s);
+      pth.setAttribute("stroke-width", on ? 2.5 : pth.dataset.w);
     }
   };
-  g.addEventListener("mouseenter", paint("#2563eb", 2.5));
-  g.addEventListener("mouseleave", paint("#cbd5e1", 1.5));
+  g.addEventListener("mouseenter", paint(true));
+  g.addEventListener("mouseleave", paint(false));
 }
 
-// ---- per-concept table ----
+// ---- per-concept notes table ----
+const fmtDue = d => {
+  if (!d) return "—";
+  return d <= DATA.generated ? "today" : d;
+};
 const tbody = document.querySelector("#cards tbody");
 for (const c of DATA.concepts) {
   const tr = document.createElement("tr");
-  for (const v of [c.name, c.status, c.est_sessions, c.cards, c.due]) {
+  const status = c.status === "done" && !c.cards ? "done · no cards" : c.status;
+  const cells = [
+    ["", c.name], ["", status], ["dt", fmtDue(c.next_due)], ["note", c.note || "—"],
+  ];
+  for (const [cls, v] of cells) {
     const td = document.createElement("td");
+    if (cls) td.className = cls;
     td.textContent = v;
     tr.appendChild(td);
   }
   tbody.appendChild(tr);
 }
-document.getElementById("generated").textContent =
-  `generated ${DATA.generated} · recent grades: ${DATA.recent_grades.join(" ") || "—"}`;
+document.getElementById("generated").textContent = `generated ${DATA.generated}`;
 </script>
 </body>
 </html>

@@ -177,6 +177,8 @@ class ViewConcept(BaseModel):
     cards: int
     due: int
     est_sessions: int
+    note: str | None = None  # latest tutor note for this concept
+    next_due: date | None = None  # earliest due date among its cards
 
 
 class ViewStats(BaseModel):
@@ -185,6 +187,21 @@ class ViewStats(BaseModel):
     cards_total: int
     cards_due: int
     frontier: list[str]
+    # honest memory buckets — counts, never a percentage (misleading at small n)
+    solid: int = 0  # stability >= 14 days
+    fragile: int = 0  # younger memory, not lapsed
+    rebuilding: int = 0  # FSRS relearning state (lapsed, being rebuilt)
+
+
+class ForecastDay(BaseModel):
+    date: date
+    count: int  # cards coming due this day (overdue collapses into today)
+
+
+class WatchItem(BaseModel):
+    id: str
+    name: str
+    note: str
 
 
 class ViewData(BaseModel):
@@ -195,3 +212,6 @@ class ViewData(BaseModel):
     stats: ViewStats
     concepts: list[ViewConcept]
     recent_grades: list[Grade]
+    next_hint: str | None = None  # tutor's next-session hint — the page's headline
+    forecast: list[ForecastDay] = Field(default_factory=list)  # next 14 days
+    watch: list[WatchItem] = Field(default_factory=list)  # freshest notes, max 3
