@@ -20,6 +20,9 @@ The pieces:
   scheduling + syllabus progress).
 - `save_session` — writes the session files and makes one git commit in the
   data repo.
+- `view` — deterministic tooling around the loop: `seba view` renders
+  `GoalState` through a bundled self-contained HTML template
+  (`src/seba/ui/view_template.html`) — the CLI only injects a JSON blob.
 
 Claude Code is the LLM half — dialogue and grading — and reaches the
 deterministic half only through the CLI, directed by the `seba-tutor` skill.
@@ -68,6 +71,7 @@ is the exception).
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session |
 | `seba abandon GOAL [--discard]` | quit early: save as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a drafted syllabus YAML |
+| `seba view GOAL [--json] [--open]` | render the goal's dependency graph + card status to HTML; `--json` prints the data blob instead, `--open` shows it in the browser |
 
 ## Data directory layout
 

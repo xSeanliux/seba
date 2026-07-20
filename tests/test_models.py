@@ -78,3 +78,39 @@ def test_subject_profile():
         session_shape="review-heavy",
     )
     assert p.max_reviews_per_session == 20
+
+
+def test_view_data_shape():
+    from datetime import date
+
+    from seba.models import ViewConcept, ViewData, ViewStats
+
+    v = ViewData(
+        goal="prob",
+        subject="probability",
+        session_number=3,
+        generated=date(2026, 7, 15),
+        stats=ViewStats(
+            concepts_done=1,
+            concepts_total=2,
+            cards_total=5,
+            cards_due=2,
+            frontier=["bayes"],
+        ),
+        concepts=[
+            ViewConcept(
+                id="bayes",
+                name="Bayes",
+                status="unseen",
+                layer=1,
+                prereqs=["sample-spaces"],
+                cards=3,
+                due=2,
+                est_sessions=2,
+            )
+        ],
+        recent_grades=["good"],
+    )
+    blob = v.model_dump(mode="json")
+    assert blob["generated"] == "2026-07-15"  # JSON-safe for the template
+    assert blob["concepts"][0]["status"] == "unseen"  # enum -> plain string

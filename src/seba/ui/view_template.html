@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>seba — goal view</title>
+<style>
+  body { font: 14px/1.5 -apple-system, system-ui, sans-serif; color: #0f172a;
+         background: #f8fafc; max-width: 1040px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { margin: 0 0 .25rem; font-size: 1.45rem; letter-spacing: -.01em; }
+  #stats { color: #475569; margin: 0 0 .6rem; }
+  #bar { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden;
+         max-width: 420px; margin: 0 0 .75rem; }
+  #bar i { display: block; height: 100%; background: #22c55e; border-radius: 3px; }
+  .legend { color: #475569; font-size: 12px; margin: 0 0 1rem; }
+  .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px;
+              margin: 0 4px 0 12px; vertical-align: -1px; border: 1px solid #64748b; }
+  #graphwrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+               padding: 12px; margin-bottom: 2rem; }
+  #graph { display: block; margin: 0 auto; height: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e2e8f0; }
+  th { color: #475569; font-weight: 600; }
+  #generated { color: #94a3b8; font-size: 12px; margin-top: 1.5rem; }
+</style>
+</head>
+<body>
+<h1 id="title"></h1>
+<p id="stats"></p>
+<div id="bar"><i></i></div>
+<p class="legend">status:
+  <i style="background:#e2e8f0"></i>unseen
+  <i style="background:#fde68a"></i>in-progress
+  <i style="background:#86efac"></i>done
+  <i style="background:#fff;border-color:#2563eb;border-width:2px"></i>frontier
+</p>
+<div id="graphwrap"><svg id="graph"></svg></div>
+<table id="cards">
+  <thead><tr><th>concept</th><th>status</th><th>est. sessions</th><th>cards</th><th>due</th></tr></thead>
+  <tbody></tbody>
+</table>
+<p id="generated"></p>
+<script>
+const DATA = __SEBA_DATA__;
+const COLORS = { "unseen": "#e2e8f0", "in-progress": "#fde68a", "done": "#86efac" };
+
+document.title = `seba — ${DATA.goal}`;
+document.getElementById("title").textContent = `${DATA.goal} (${DATA.subject})`;
+const S = DATA.stats;
+document.getElementById("stats").textContent =
+  `session ${DATA.session_number} · concepts ${S.concepts_done}/${S.concepts_total} done · ` +
+  `cards ${S.cards_total} (${S.cards_due} due today) · frontier: ${S.frontier.join(", ") || "none"}`;
+
+document.querySelector("#bar i").style.width =
+  S.concepts_total ? `${(100 * S.concepts_done / S.concepts_total).toFixed(1)}%` : "0";
+
+// ---- layered dependency graph: layers flow DOWN, scaled to fit the page ----
+const svg = document.getElementById("graph");
+const NS = "http://www.w3.org/2000/svg";
+const W = 190, H = 52, XGAP = 28, YGAP = 58, PAD = 16;
+const layers = new Map();
+for (const c of DATA.concepts) {
+  if (!layers.has(c.layer)) layers.set(c.layer, []);
+  c._col = layers.get(c.layer).length;
+  layers.get(c.layer).push(c);
+}
+const maxPerLayer = Math.max(1, ...[...layers.values()].map(l => l.length));
+const rowW = maxPerLayer * W + (maxPerLayer - 1) * XGAP;
+const nLayers = Math.max(0, ...DATA.concepts.map(c => c.layer)) + 1;
+const totalW = PAD * 2 + rowW;
+const totalH = PAD * 2 + nLayers * H + (nLayers - 1) * YGAP;
+const pos = new Map();
+for (const [ln, list] of layers) {                 // center each layer's row
+  const lw = list.length * W + (list.length - 1) * XGAP;
+  const x0 = PAD + (rowW - lw) / 2;
+  list.forEach((c, i) =>
+    pos.set(c.id, { x: x0 + i * (W + XGAP), y: PAD + ln * (H + YGAP) }));
+}
+svg.setAttribute("viewBox", `0 0 ${totalW} ${totalH}`);  // scale down, never scroll
+svg.style.width = `min(100%, ${totalW}px)`;              // ...and never upscale
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  (parent || svg).appendChild(e);
+  return e;
+}
+const defs = el("defs", {});
+el("marker", { id: "arr", viewBox: "0 0 10 10", refX: 8, refY: 5,
+               markerWidth: 5.5, markerHeight: 5.5, orient: "auto-start-reverse" }, defs);
+el("path", { d: "M0,0 L10,5 L0,10 z", fill: "#a5b4cb" }, defs.firstChild);
+const sh = el("filter", { id: "sh", x: "-20%", y: "-20%", width: "140%", height: "140%" }, defs);
+el("feDropShadow", { dx: 0, dy: 1, stdDeviation: 1.4,
+                     "flood-color": "#0f172a", "flood-opacity": 0.16 }, sh);
+
+const edgesByNode = new Map();                     // node id -> its edge paths
+for (const c of DATA.concepts)                     // edges first, under the nodes
+  for (const p of c.prereqs) {
+    const a = pos.get(p), b = pos.get(c.id);
+    if (!a || !b) continue;
+    const x1 = a.x + W / 2, y1 = a.y + H, x2 = b.x + W / 2, y2 = b.y;
+    const path = el("path", {
+      d: `M${x1},${y1} C${x1},${y1 + YGAP / 2} ${x2},${y2 - YGAP / 2} ${x2},${y2 - 4}`,
+      fill: "none", stroke: "#cbd5e1", "stroke-width": 1.5, "marker-end": "url(#arr)",
+    });
+    for (const id of [p, c.id])
+      edgesByNode.set(id, [...(edgesByNode.get(id) || []), path]);
+  }
+for (const c of DATA.concepts) {
+  const { x, y } = pos.get(c.id);
+  const onFrontier = S.frontier.includes(c.id);
+  const g = el("g", { style: "cursor: default" });
+  el("rect", { x, y, width: W, height: H, rx: 10, fill: COLORS[c.status] || "#e2e8f0",
+               stroke: onFrontier ? "#2563eb" : "#94a3b8",
+               "stroke-width": onFrontier ? 2.5 : 1, filter: "url(#sh)" }, g);
+  const check = c.status === "done" ? "✓ " : "";
+  const t1 = el("text", { x: x + 12, y: y + 21, "font-size": 12.5, "font-weight": 600 }, g);
+  t1.textContent = check + (c.name.length > 25 ? c.name.slice(0, 24) + "…" : c.name);
+  const t2 = el("text", { x: x + 12, y: y + 39, "font-size": 11, fill: "#475569" }, g);
+  t2.textContent = `${c.cards} card${c.cards === 1 ? "" : "s"}` +
+    (c.due ? ` · ${c.due} due` : "") + ` · ~${c.est_sessions} session${c.est_sessions === 1 ? "" : "s"}`;
+  const paint = (stroke, width) => () => {
+    for (const pth of edgesByNode.get(c.id) || []) {
+      pth.setAttribute("stroke", stroke);
+      pth.setAttribute("stroke-width", width);
+    }
+  };
+  g.addEventListener("mouseenter", paint("#2563eb", 2.5));
+  g.addEventListener("mouseleave", paint("#cbd5e1", 1.5));
+}
+
+// ---- per-concept table ----
+const tbody = document.querySelector("#cards tbody");
+for (const c of DATA.concepts) {
+  const tr = document.createElement("tr");
+  for (const v of [c.name, c.status, c.est_sessions, c.cards, c.due]) {
+    const td = document.createElement("td");
+    td.textContent = v;
+    tr.appendChild(td);
+  }
+  tbody.appendChild(tr);
+}
+document.getElementById("generated").textContent =
+  `generated ${DATA.generated} · recent grades: ${DATA.recent_grades.join(" ") || "—"}`;
+</script>
+</body>
+</html>

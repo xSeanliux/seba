@@ -20,6 +20,7 @@ from seba.session.tools import ToolHandler
 from seba.store.store import Store
 from seba.syllabus.graph import SyllabusError, load_syllabus
 from seba.ui import repl
+from seba.ui.view import build_view_data, render_view
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -219,3 +220,24 @@ def abandon(
         typer.echo("pending session discarded")
         return
     _finish(store, goal, pending, ppath)  # complete=False → INCOMPLETE marker
+
+
+@app.command()
+def view(
+    goal: str,
+    json_out: bool = typer.Option(
+        False, "--json", help="print the data blob instead of writing HTML"
+    ),
+    open_browser: bool = typer.Option(False, "--open", help="open the rendered view"),
+):
+    store = _store()
+    state = store.load_goal(goal)
+    data = build_view_data(state, date.today())
+    if json_out:
+        typer.echo(data.model_dump_json())
+        return
+    out = store.data_dir / "goals" / goal / "view.html"
+    out.write_text(render_view(data))
+    typer.echo(str(out))
+    if open_browser:
+        typer.launch(str(out))

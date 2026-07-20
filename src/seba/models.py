@@ -166,3 +166,32 @@ class PendingSession(BaseModel):
     agenda: Agenda
     record: SessionRecord = Field(default_factory=SessionRecord)
     started: date
+
+
+class ViewConcept(BaseModel):
+    id: str
+    name: str
+    status: Status
+    layer: int  # longest prereq path from a root; drives graph column
+    prereqs: list[str]
+    cards: int
+    due: int
+    est_sessions: int
+
+
+class ViewStats(BaseModel):
+    concepts_done: int
+    concepts_total: int
+    cards_total: int
+    cards_due: int
+    frontier: list[str]
+
+
+class ViewData(BaseModel):
+    goal: str
+    subject: str
+    session_number: int
+    generated: date
+    stats: ViewStats
+    concepts: list[ViewConcept]
+    recent_grades: list[Grade]
