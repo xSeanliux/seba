@@ -67,6 +67,96 @@ def test_card_counts_and_due():
     assert v.generated == TODAY and v.recent_grades == ["good", "again"]
 
 
+def test_enriched_fields_hint_notes_watch():
+    from seba.models import GoalState, Syllabus
+
+    notes = (
+        "## a\n- [s003] watch X under pressure\n- [s001] older note\n\n"
+        "## b\n- [s004] slips on Y\n\n## c\n- [s002] fine\n\n## d\n- [s001] old\n"
+    )
+    s = GoalState(
+        name="prob",
+        subject="probability",
+        syllabus=Syllabus(
+            goal="prob",
+            subject="probability",
+            concepts=[Concept(id=x, name=x.upper()) for x in "abcd"],
+        ),
+        items=[],
+        notes=notes,
+        last_hint="drill the prior/likelihood split",
+        session_number=5,
+        recent_grades=[],
+    )
+    v = build_view_data(s, TODAY)
+    assert v.next_hint == "drill the prior/likelihood split"
+    by = {c.id: c for c in v.concepts}
+    assert by["a"].note == "watch X under pressure"  # newest bullet, marker stripped
+    # watch = freshest 3 by session marker, newest first
+    assert [(w.id, w.note) for w in v.watch][:2] == [
+        ("b", "slips on Y"),
+        ("a", "watch X under pressure"),
+    ]
+    assert len(v.watch) == 3 and v.watch[2].id == "c"
+
+
+def test_buckets_forecast_next_due():
+    def fsrs(due, stability=5.0, state_=2):
+        return {"due": due, "stability": stability, "state": state_}
+
+    items = [
+        item("it-1", "a"),  # overdue (2020) -> today's forecast bucket; fragile
+        Item(
+            id="it-2",
+            concept="a",
+            type="recall",
+            front="f",
+            back="b",
+            fsrs=fsrs("2026-07-18T00:00:00+00:00", stability=20.0),
+            created=TODAY,
+        ),
+        Item(
+            id="it-3",
+            concept="a",
+            type="recall",
+            front="f",
+            back="b",
+            fsrs=fsrs("2026-07-18T00:00:00+00:00", state_=3),
+            created=TODAY,
+        ),
+        Item(
+            id="it-4",
+            concept="a",
+            type="recall",
+            front="f",
+            back="b",
+            fsrs=fsrs("2099-01-01T00:00:00+00:00"),
+            created=TODAY,
+        ),  # beyond horizon
+    ]
+    v = build_view_data(state([Concept(id="a", name="A")], items), TODAY)
+    assert (v.stats.solid, v.stats.fragile, v.stats.rebuilding) == (1, 2, 1)
+    assert len(v.forecast) == 14
+    assert v.forecast[0].date == TODAY and v.forecast[0].count == 1  # overdue -> today
+    assert v.forecast[3].date == TODAY.replace(day=18) and v.forecast[3].count == 2
+    assert sum(d.count for d in v.forecast) == 3  # 2099 card excluded
+    [c] = v.concepts
+    assert c.next_due == date(2020, 1, 1)  # earliest across cards
+
+
+def test_deck_carries_card_contents():
+    items = [
+        item("it-1", "a"),  # front="f", back="b", stability absent -> fragile
+        item("it-2", "a", suspended=True),
+    ]
+    v = build_view_data(state([Concept(id="a", name="A")], items), TODAY)
+    [c] = v.concepts
+    assert len(c.deck) == 2
+    assert (c.deck[0].front, c.deck[0].back, c.deck[0].type) == ("f", "b", "recall")
+    assert c.deck[0].bucket == "fragile" and c.deck[0].due == date(2020, 1, 1)
+    assert c.deck[1].bucket == "suspended"
+
+
 def test_render_view_injects_data():
     v = build_view_data(state([Concept(id="a", name="A")]), TODAY)
     html = render_view(v)
