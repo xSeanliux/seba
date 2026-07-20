@@ -62,7 +62,13 @@ refusal.
      named section. **Never load a whole book, PDF, or site into context.**
    - If both are empty, say so ("no source loaded — teaching from general knowledge").
 
-   Method: worked example → faded scaffolding → independent practice, about
+   Method: for **new material** (concept status `unseen`), open with a short
+   interactive introduction before any questioning — motivate the concept (why
+   it matters, where it connects to what the learner knows), sketch the big
+   picture, and invite the learner's intuition ("what do you think happens
+   when…?") rather than lecturing. Reviews of already-seen material skip this —
+   go straight to the exchange. Then: worked example → faded scaffolding →
+   independent practice, about
    `agenda.practice_quota` practice questions, targeting ~85% learner success. Ask
    "why?" and "convince me" follow-ups. Never dump an answer the learner could
    produce with one more hint.
