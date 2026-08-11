@@ -17,6 +17,7 @@ from seba.syllabus.graph import frontier
 
 BRIEFING_BUDGET = 4_000
 EXCERPT_BUDGET = 16_000
+PRACTICE_QUOTA = {PaceHint.PUSH_HARDER: 5, PaceHint.STEADY: 3, PaceHint.STEP_BACK: 2}
 
 
 def resolve_excerpt(sources_dir: Path, ref: str, budget: int) -> str | None:
@@ -103,6 +104,7 @@ def build_agenda(
     if len(briefing) > BRIEFING_BUDGET:
         briefing = briefing[:BRIEFING_BUDGET] + "\n(older notes omitted)"
 
+    pace = _pace(state.recent_grades)
     return Agenda(
         goal=state.name,
         subject=state.subject,
@@ -110,6 +112,6 @@ def build_agenda(
         briefing=briefing,
         review_items=reviews,
         teach_concept=teach,
-        practice_quota=3,
-        pace_hint=_pace(state.recent_grades),
+        practice_quota=PRACTICE_QUOTA[pace],
+        pace_hint=pace,
     )

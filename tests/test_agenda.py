@@ -79,13 +79,16 @@ def test_reviews_capped_by_profile(tmp_path):
     assert len(a.review_items) == 6
 
 
-def test_pace_hint(tmp_path):
+def test_pace_hint_drives_practice_quota(tmp_path):
     s = state([Concept(id="a", name="A")], recent=["good"] * 10)
-    assert build_agenda(s, profile(), TODAY, tmp_path).pace_hint == "push-harder"
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert (a.pace_hint, a.practice_quota) == ("push-harder", 5)
     s = state([Concept(id="a", name="A")], recent=["again"] * 10)
-    assert build_agenda(s, profile(), TODAY, tmp_path).pace_hint == "step-back"
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert (a.pace_hint, a.practice_quota) == ("step-back", 2)
     s = state([Concept(id="a", name="A")], recent=["skipped"] * 10)
-    assert build_agenda(s, profile(), TODAY, tmp_path).pace_hint == "steady"
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert (a.pace_hint, a.practice_quota) == ("steady", 3)
 
 
 def test_briefing_scoped_notes_and_budget(tmp_path):
