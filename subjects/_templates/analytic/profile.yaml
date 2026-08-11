@@ -1,0 +1,7 @@
+name: TEMPLATE
+kind: analytic
+max_reviews_per_session: 10
+item_types: [recall, apply, produce]
+session_shape: teach-heavy
+</content>
+</invoke>
