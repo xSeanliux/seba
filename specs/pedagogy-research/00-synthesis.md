@@ -1,7 +1,10 @@
 # Synthesis: what the evidence says Seba's teaching style should be
 
-Sources: `01-tutoring-science.md`, `02-abstract-technical.md`,
-`03-language-and-linguistics.md`, `04-learning-science.md`, `05-llm-tutors.md`.
+Sources: everything under `teaching-style/` — `01-tutoring-science.md`,
+`02-abstract-technical.md`, `03-language-and-linguistics.md`,
+`04-learning-science.md`, `05-llm-tutors.md`. This report covers **how to
+teach a turn**; the companion sweep under `architecture/` covers **what the
+system should model and schedule**.
 Every claim below is cited in one of those; section refs point there.
 
 ---
