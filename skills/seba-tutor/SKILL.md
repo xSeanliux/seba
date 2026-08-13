@@ -18,7 +18,7 @@ record does not exist next session.
 | `seba status` | list goals with due counts |
 | `seba start GOAL` | begin/resume a session; prints YAML: `agenda`, `subject_style`, `already_graded`, `ungraded_reviews`, `minted_so_far` |
 | `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record a review grade the moment its exchange resolves |
-| `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create a spaced-repetition card (cap 10/session) |
+| `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create a spaced-repetition card (per-session budget, set by the subject's review capacity — it tells you the number when you hit it) |
 | `seba concept GOAL ID [--status started\|completed] [--note TEXT]` | record concept progress or a misconception/strength note |
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session (refuses while reviews are ungraded) |
 | `seba abandon GOAL [--discard]` | learner quits early: save what was recorded as INCOMPLETE (or discard) |
@@ -221,7 +221,12 @@ Give the definition, the vocabulary, one worked example — then resume asking.
    concepts:
      - id: sample-spaces                          # kebab-case, unique across the file
        name: Sample spaces and events             # human-readable
-       prereqs: []                                # list of other concept ids (may be [])
+       prereqs: []                                # HARD gate: ids that must be done first (may be [])
+       soft_prereqs: []                           # helpful-but-not-required ids; never block teaching
+       confusable_with: []                        # ids a learner genuinely mixes up with this one;
+                                                  # symmetric, declare on either side, drives interleaved practice
+       kc_type: concept                           # fact | concept | procedure | principle — what kind of
+                                                  # knowledge this is; picks the teaching method
        sources: []                                # locators for THIS concept, each a SMALL slice:
                                                   # "blitzstein/ch01.md#1.2" (markdown under sources/, pre-loaded),
                                                   # "algebra.pdf p.40-58" (local PDF pages), or "https://…/ch3"
@@ -231,6 +236,9 @@ Give the definition, the vocabulary, one worked example — then resume asking.
      - id: conditional-probability
        name: Conditional probability and Bayes
        prereqs: [sample-spaces]                   # edges may reorder / cut across chapter order
+       soft_prereqs: []
+       confusable_with: []
+       kc_type: concept
        sources: []
        status: unseen
        est_sessions: 2
@@ -243,7 +251,8 @@ Give the definition, the vocabulary, one worked example — then resume asking.
    gate, not a formality.
 4. Write it to a temp file and run `seba new-goal NAME --subject SUBJECT
    --from-file PATH`. `new-goal` validates and rejects the file (read the stderr
-   message, fix, retry) on exactly three things: **duplicate concept ids**, a
-   **prereq naming an id not in the file**, or a **prereq cycle**. Subjects
+   message, fix, retry) on exactly three things: **duplicate concept ids**, any of
+   `prereqs`/`soft_prereqs`/`confusable_with` **naming an id not in the file**, or a
+   **cycle** in `prereqs` + `soft_prereqs` together. Subjects
    `probability`, `italian` are bundled; for a new subject, copy a template from
    the repo's `subjects/_templates/` into `$SEBA_DATA_DIR/subjects/<name>/` first.

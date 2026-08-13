@@ -18,10 +18,14 @@ def validate(s: Syllabus) -> None:
         raise SyllabusError(f"duplicate concept ids: {sorted(dupes)}")
     known = set(ids)
     for c in s.concepts:
-        unknown = [p for p in c.prereqs if p not in known]
-        if unknown:
-            raise SyllabusError(f"concept '{c.id}' has unknown prereqs: {unknown}")
-    ts = TopologicalSorter({c.id: set(c.prereqs) for c in s.concepts})
+        for field in ("prereqs", "soft_prereqs", "confusable_with"):
+            unknown = [i for i in getattr(c, field) if i not in known]
+            if unknown:
+                raise SyllabusError(f"concept '{c.id}' has unknown {field}: {unknown}")
+    # confusable_with is symmetric, not a dependency — deliberately not an edge here.
+    ts = TopologicalSorter(
+        {c.id: set(c.prereqs) | set(c.soft_prereqs) for c in s.concepts}
+    )
     try:
         ts.prepare()
     except CycleError as e:
@@ -45,6 +49,18 @@ def frontier(s: Syllabus) -> list[Concept]:
         for c in s.concepts
         if c.status != "done" and all(p in done for p in c.prereqs)
     ]
+
+
+def confusables(s: Syllabus, concept_id: str) -> list[str]:
+    """Concepts confusable with this one, in both declared directions."""
+    out: set[str] = set()
+    for c in s.concepts:
+        if c.id == concept_id:
+            out |= set(c.confusable_with)
+        elif concept_id in c.confusable_with:
+            out.add(c.id)
+    out.discard(concept_id)
+    return sorted(out)
 
 
 _ORDER: list[Status] = [Status.UNSEEN, Status.IN_PROGRESS, Status.DONE]

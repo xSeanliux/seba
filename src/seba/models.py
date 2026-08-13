@@ -37,9 +37,14 @@ class Concept(BaseModel):
     id: str
     name: str
     prereqs: list[str] = Field(default_factory=list)
+    # Advisory edges: the syllabus is LLM-drafted from a table of contents, so a
+    # wrong hard edge would strand a concept forever. These never gate the frontier.
+    soft_prereqs: list[str] = Field(default_factory=list)
+    confusable_with: list[str] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list)
     status: Status = Status.UNSEEN
     est_sessions: int = 1
+    kc_type: Literal["fact", "concept", "procedure", "principle"] = "concept"
 
 
 class Syllabus(BaseModel):
