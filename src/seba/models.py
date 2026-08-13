@@ -2,7 +2,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ItemType(StrEnum):
@@ -122,6 +122,18 @@ class UpdateConcept(BaseModel):
     id: str
     status_change: Literal["started", "completed"] | None = None
     note: str | None = None
+    evidence: str | None = None
+
+    @model_validator(mode="after")
+    def _completed_needs_evidence(self) -> "UpdateConcept":
+        # Naming the exchange moves the call from mastery attribution (which the
+        # model does badly) toward turn correctness (which it does well).
+        if self.status_change == "completed" and not (self.evidence or "").strip():
+            raise ValueError(
+                "completing a concept requires `evidence`: name the specific "
+                "exchange in this session that demonstrated the learner has it"
+            )
+        return self
 
 
 class EndSession(BaseModel):
@@ -158,6 +170,10 @@ class GoalState(BaseModel):
     session_number: int
     recent_grades: list[Grade] = Field(default_factory=list)
     recent_by_concept: dict[str, list[Grade]] = Field(default_factory=dict)
+    recent_by_item: dict[str, list[Grade]] = Field(default_factory=dict)
+    # Concepts with a good/easy card review in a session strictly after the one
+    # where teaching started — the delayed, unaided check `completed` is gated on.
+    delayed_pass: set[str] = Field(default_factory=set)
 
 
 class GoalSummary(BaseModel):

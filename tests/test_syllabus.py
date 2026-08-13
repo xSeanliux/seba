@@ -61,9 +61,21 @@ def test_apply_status_legal_and_illegal():
     s2 = apply_status(s, "a", "in-progress")
     assert s2.concepts[0].status == "in-progress"
     with pytest.raises(SyllabusError):
-        apply_status(s, "a", "done")
+        apply_status(s, "a", "done")  # no skipping unseen -> done
     with pytest.raises(SyllabusError, match="nope"):
         apply_status(s, "nope", "done")
+
+
+def test_done_reopens_but_other_moves_back_are_illegal():
+    s = make([Concept(id="a", name="A", status="done")])
+    assert apply_status(s, "a", "in-progress").concepts[0].status == "in-progress"
+    with pytest.raises(SyllabusError):
+        apply_status(s, "a", "unseen")
+    with pytest.raises(SyllabusError):
+        apply_status(s, "a", "done")  # already done: not a move
+    ip = make([Concept(id="a", name="A", status="in-progress")])
+    with pytest.raises(SyllabusError):
+        apply_status(ip, "a", "unseen")
 
 
 def test_load_syllabus_yaml(tmp_path: Path):

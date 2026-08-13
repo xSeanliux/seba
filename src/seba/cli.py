@@ -104,6 +104,8 @@ def _session(goal: str):
         state.syllabus,
         config.data_dir() / "sources",
         _profile(state.subject).max_reviews_per_session,
+        state.delayed_pass,
+        {i.concept for i in state.items},
     )
     handler.record = pending.record
     return store, pending, handler, ppath
@@ -190,11 +192,19 @@ def concept_cmd(
     concept_id: str,
     status: str | None = typer.Option(None, help="started|completed"),
     note: str | None = typer.Option(None),
+    evidence: str | None = typer.Option(
+        None, help="required with --status completed: the exchange that showed it"
+    ),
 ):
     _dispatch(
         goal,
         "update_concept",
-        {"id": concept_id, "status_change": status, "note": note},
+        {
+            "id": concept_id,
+            "status_change": status,
+            "note": note,
+            "evidence": evidence,
+        },
     )
 
 

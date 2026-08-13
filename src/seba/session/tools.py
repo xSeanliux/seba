@@ -37,11 +37,15 @@ class ToolHandler:
         syllabus: Syllabus,
         sources_dir: Path,
         max_reviews_per_session: int,
+        delayed_pass: set[str],
+        carded: set[str],
     ):
         self.agenda = agenda
         self.syllabus = syllabus
         self.sources_dir = sources_dir
         self.max_reviews = max_reviews_per_session
+        self.delayed_pass = delayed_pass
+        self.carded = carded
         self.mint_budget = mint_budget(max_reviews_per_session)
         self.record = SessionRecord()
 
@@ -81,8 +85,19 @@ class ToolHandler:
     def _update_concept(self, call: UpdateConcept) -> tuple[str, bool]:
         if call.id not in {c.id for c in self.syllabus.concepts}:
             return f"unknown concept: '{call.id}'", True
+        note = ""
+        if call.status_change == "completed" and call.id not in self.delayed_pass:
+            if call.id in self.carded:
+                return (
+                    f"'{call.id}' has no unaided pass in a later session; it needs "
+                    "one good/easy review of one of its cards after the session "
+                    "where teaching started"
+                ), True
+            # No cards means the delayed check can never be satisfied; allowing it
+            # unremarked would hide that this completion rests on the tutor alone.
+            note = " (no cards for this concept, so the delayed check was skipped)"
         self.record.concepts.append(call)
-        return "recorded", False
+        return "recorded" + note, False
 
     def _end_session(self, call: EndSession) -> tuple[str, bool]:
         if self.record.complete:

@@ -72,7 +72,10 @@ def apply_status(s: Syllabus, concept_id: str, status: Status) -> Syllabus:
     for c in s.concepts:
         if c.id == concept_id:
             found = True
-            if _ORDER.index(status) != _ORDER.index(c.status) + 1:
+            # Forward one step, or a reopen: retention decays and a `done`
+            # concept whose cards are lapsing has to become teachable again.
+            reopen = (c.status, status) == (Status.DONE, Status.IN_PROGRESS)
+            if not reopen and _ORDER.index(status) != _ORDER.index(c.status) + 1:
                 raise SyllabusError(
                     f"illegal status move for '{concept_id}': {c.status} -> {status}"
                 )
