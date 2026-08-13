@@ -165,6 +165,32 @@ def test_delayed_pass_needs_a_later_session(store):
     assert gs2.recent_by_item == {"it-1": ["good", "easy"]}  # last two only
 
 
+def test_last_session_date_and_error_sites(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    store.save_session(
+        "prob",
+        SessionRecord(reviews=[GradeReview(id="it-1", grade="again")], complete=True),
+        "t",
+        gs,
+    )
+    gs2 = store.load_goal("prob")
+    assert gs2.last_session_date == date.today()  # stamped on save, not file mtime
+    assert gs2.last_session_errors == {"bayes"}
+    assert gs2.grades_by_concept == {"bayes": ["again"]}
+
+    # errors are the LAST session's only
+    store.save_session(
+        "prob",
+        SessionRecord(reviews=[GradeReview(id="it-1", grade="good")], complete=True),
+        "t",
+        gs,
+    )
+    gs3 = store.load_goal("prob")
+    assert gs3.last_session_errors == set()
+    assert gs3.grades_by_concept == {"bayes": ["again", "good"]}
+
+
 def test_parse_notes():
     text = "## bayes\n- shaky on priors\n\n## sigma\n- fine\n"
     assert parse_notes(text) == {"bayes": ["- shaky on priors"], "sigma": ["- fine"]}
