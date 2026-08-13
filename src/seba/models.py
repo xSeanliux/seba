@@ -82,6 +82,10 @@ class ReviewItem(BaseModel):
 class TeachConcept(BaseModel):
     id: str
     name: str
+    kc_type: Literal["fact", "concept", "procedure", "principle"] = "concept"
+    confusable_with: list[str] = Field(
+        default_factory=list
+    )  # both declared directions; what practice interleaves against
     sources: list[str] = Field(
         default_factory=list
     )  # raw locators the tutor resolves on demand

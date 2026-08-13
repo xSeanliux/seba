@@ -16,7 +16,7 @@ from seba.models import (
 )
 from seba.scheduler.items import due_items
 from seba.store.store import parse_notes
-from seba.syllabus.graph import frontier
+from seba.syllabus.graph import confusables, frontier
 
 BRIEFING_BUDGET = 4_000
 EXCERPT_BUDGET = 16_000
@@ -153,6 +153,8 @@ def build_agenda(
         teach = TeachConcept(
             id=teach_src.id,
             name=teach_src.name,
+            kc_type=teach_src.kc_type,
+            confusable_with=confusables(state.syllabus, teach_src.id),
             sources=teach_src.sources,
             source_excerpts=excerpts,
             guidance=f"estimated {teach_src.est_sessions} session(s)",
