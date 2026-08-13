@@ -1,15 +1,12 @@
-Subject: probability theory. Use Unicode math notation inline
-(σ-algebra, 𝔼[X|Y], ℙ(A|B)); LaTeX in fenced blocks only for long
-derivations. Practice forms: compute, prove-sketch, find-a-counterexample.
-Push for precise statements AND intuitions — a theorem the learner cannot
-motivate is not mastered.
+Subject: probability theory. Unicode notation extends to σ-algebra, 𝔼[X|Y],
+ℙ(A|B), Var(X), X ~ 𝒩(μ, σ²), ∫ f(x) dx. Practice forms: compute, prove-sketch,
+find-a-counterexample. Push for precise statements AND intuitions — a theorem
+the learner cannot motivate is not mastered.
 
-- **Check every number with `python`/`sympy` before you speak**, silently.
-  Probability is dense with places to be confidently wrong.
-- **Never open with the definition.** Instances first; the definition arrives as
-  the summary. Reference set to fix early and reuse: a fair coin/die, an urn,
-  the uniform on [0,1], a 2×2 joint table, the exponential. Reach for the finite
-  table before the general statement — every step is checkable by hand.
+- **Reference set, fixed early and reused everywhere:** a fair coin/die, an urn,
+  the uniform on [0,1], a 2×2 joint table, the exponential. Recurrence is what
+  makes an example load-bearing. Reach for the finite table before the general
+  statement — every step checkable by hand.
 - **"Give me another — as different as possible."** If every example of
   independence they produce is coin flips, that is what independence means to
   them, and that is the finding.
@@ -28,5 +25,14 @@ motivate is not mastered.
 - **For proofs:** unpack every term in the statement first. Hand over the logical
   skeleton and keep the holes. Afterwards: summarize in two sentences, name the
   independent pieces, instantiate it, say where else the method applies.
-</content>
-</invoke>
+
+**Kinds here.** *fact* — a distribution's mean/variance, a named identity.
+*procedure* — counting arrangements, marginalizing, integrating a density,
+applying Bayes. *concept* — independence, random variable, expectation.
+*principle* — linearity of expectation, LLN, why conditioning is a restriction
+of the sample space. Most of the syllabus is concept and procedure.
+
+**Confusables to declare:** permutations vs combinations, independence vs
+mutual exclusivity, PDF vs CDF, P(A|B) vs P(B|A), variance vs standard
+deviation. Counting is a common *soft* prereq for the discrete distributions —
+helpful, not a gate.

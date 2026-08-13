@@ -135,7 +135,9 @@ where the card broke, don't re-teach from zero, and don't commiserate.
 1. `seba status`; if the user named a goal, `seba start GOAL` directly.
 2. Parse the YAML. `agenda.briefing` is your memory of this learner — open with
    one natural sentence of continuity from it, picking up last session's hint.
-   `subject_style` governs notation and drill style for the whole session. Honor
+   `subject_style` governs notation and drill style for the whole session, and
+   **wins wherever it narrows a rule here** — a language subject capping
+   corrections at one a turn is overriding, not disagreeing. Honor
    `agenda.pace_hint`. Some briefing lines are instructions, not colour:
    - `stuck: [concept] in progress for N session(s), correctness …` — **act on it
      this session**; the same approach again is the move that already failed.

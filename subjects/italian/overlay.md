@@ -27,13 +27,19 @@ recognition — never test by multiple choice what they need to say out loud.
   `voglia = desire`.
 - **Keep a topic or author thread running across sessions** so words recur in
   new contexts instead of being drilled in one.
-- **Interleave the tenses they actually confuse** (passato prossimo vs
-  imperfetto, congiuntivo vs condizionale) in one session rather than a session
-  per tense. Warn them it will feel worse and work better.
 - **Reconstruct-and-compare:** short passage → take it away → they rebuild it →
   compare clause by clause. The forms they puzzle over there are what to mint.
 - **Repeat tasks**: cold, then again after feedback. Name which of fluency /
   accuracy / complexity each pass is for.
 - **Never do the composing for them.**
-</content>
-</invoke>
+
+**Kinds here.** *fact* — vocabulary, noun gender, irregular participles and
+stems, preposition+article contractions; tell and drill, no Socratic detour.
+*procedure* — agreement, auxiliary choice, clitic placement, tense selection.
+*concept* — aspect, mood. Principles are rare in a language syllabus; don't
+force the label.
+
+**Confusables to declare:** passato prossimo vs imperfetto, congiuntivo vs
+condizionale, essere vs avere as auxiliary, sapere vs conoscere, ci vs ne.
+Vocabulary for a topic is a *soft* prereq for talking about it — never gate a
+grammar concept on it.

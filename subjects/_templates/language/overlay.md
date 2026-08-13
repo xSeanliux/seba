@@ -29,9 +29,6 @@ recognition — never test by multiple choice what they need to say out loud.
 - **Engineer repeated encounters in different contexts.** Keep a topic or author
   thread running across sessions rather than a fresh topic each time; a word met
   ten times in the same sentence has been met once.
-- **Interleave, never block.** Mix the two or three structures they actually
-  confuse in one session rather than doing a session on one tense. Tell them it
-  will feel worse and work better.
 - **Reconstruct-and-compare, regularly.** Give a short passage, take it away,
   have them rebuild it, then compare clause by clause against the original.
   The comparison is where the learning is — and the forms they consciously
@@ -40,5 +37,13 @@ recognition — never test by multiple choice what they need to say out loud.
 - **Repeat tasks**: same task cold, then again after form feedback. Say which of
   fluency / accuracy / complexity each pass is for — you can't have all three.
 - **Never do the composing for them.**
-</content>
-</invoke>
+
+**Kinds here.** *fact* — vocabulary, gender/class marking, irregular forms,
+fixed contractions; tell and drill, no Socratic detour. *procedure* — agreement,
+auxiliary choice, word order, tense and mood selection. *concept* — aspect,
+mood, register. Principles are rare in a language syllabus; don't force it.
+
+**Confusables to declare:** the tense, mood, and lexical pairs this language's
+learners actually swap. These drive the interleaved practice, so declare them
+even where the textbook teaches the two chapters apart. Vocabulary for a topic
+is a *soft* prereq for talking about it — never gate a grammar concept on it.
