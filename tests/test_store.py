@@ -127,6 +127,22 @@ def test_malformed_items_named(store):
         store.load_goal("prob")
 
 
+def test_recent_grades_keyed_by_concept(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob")
+    record = SessionRecord(
+        reviews=[
+            GradeReview(id="it-1", grade="again"),
+            GradeReview(id="it-gone", grade="good"),
+        ],
+        complete=True,
+    )
+    store.save_session("prob", record, "t", gs.model_copy(update={"items": [item()]}))
+    gs2 = store.load_goal("prob")
+    assert gs2.recent_by_concept == {"bayes": ["again"]}  # deleted item skipped
+    assert gs2.recent_grades == ["again", "good"]  # global pool unchanged
+
+
 def test_parse_notes():
     text = "## bayes\n- shaky on priors\n\n## sigma\n- fine\n"
     assert parse_notes(text) == {"bayes": ["- shaky on priors"], "sigma": ["- fine"]}

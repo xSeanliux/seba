@@ -12,7 +12,15 @@ from seba.models import (
     UpdateConcept,
 )
 
-MINT_CAP = 10
+
+def mint_budget(max_reviews_per_session: int) -> int:
+    """New cards per session, budgeted against review capacity.
+
+    Minting faster than the session can review grows a due queue that never
+    drains; once the review cap binds it becomes the scheduler and FSRS's
+    intervals are silently overrun."""
+    return max(2, min(5, max_reviews_per_session // 2))
+
 
 TOOL_MODELS: dict[str, type[BaseModel]] = {
     "grade_review": GradeReview,
@@ -23,10 +31,18 @@ TOOL_MODELS: dict[str, type[BaseModel]] = {
 
 
 class ToolHandler:
-    def __init__(self, agenda: Agenda, syllabus: Syllabus, sources_dir: Path):
+    def __init__(
+        self,
+        agenda: Agenda,
+        syllabus: Syllabus,
+        sources_dir: Path,
+        max_reviews_per_session: int,
+    ):
         self.agenda = agenda
         self.syllabus = syllabus
         self.sources_dir = sources_dir
+        self.max_reviews = max_reviews_per_session
+        self.mint_budget = mint_budget(max_reviews_per_session)
         self.record = SessionRecord()
 
     def missing_grades(self) -> list[str]:
@@ -52,8 +68,11 @@ class ToolHandler:
         return "recorded", False
 
     def _mint_item(self, call: MintItem) -> tuple[str, bool]:
-        if len(self.record.new_items) >= MINT_CAP:
-            return f"mint cap reached ({MINT_CAP}); no more cards this session", True
+        if len(self.record.new_items) >= self.mint_budget:
+            return (
+                f"mint budget reached ({self.mint_budget} this session); "
+                f"review capacity is {self.max_reviews}/session"
+            ), True
         if call.concept not in {c.id for c in self.syllabus.concepts}:
             return f"unknown concept: '{call.concept}'", True
         self.record.new_items.append(call)

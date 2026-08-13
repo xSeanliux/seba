@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from seba.models import GoalState, GoalSummary, Item, SessionRecord, Syllabus
+from seba.models import GoalState, GoalSummary, Grade, Item, SessionRecord, Syllabus
 from seba.syllabus.graph import SyllabusError, load_syllabus
 
 
@@ -91,10 +91,16 @@ class Store:
             raise StoreError(str(e)) from e
         items = self._load_items(gdir / "items.jsonl")
         outcomes = self._outcomes_files(name)
+        concept_of = {i.id: i.concept for i in items}
         last_hint, recent_grades = None, []
+        by_concept: dict[str, list[Grade]] = {}
         for path in outcomes[-3:]:
             rec = SessionRecord.model_validate(yaml.safe_load(path.read_text()))
-            recent_grades.extend(r.grade for r in rec.reviews)
+            for r in rec.reviews:
+                recent_grades.append(r.grade)
+                cid = concept_of.get(r.id)  # item may since have been deleted
+                if cid is not None:
+                    by_concept.setdefault(cid, []).append(r.grade)
             last_hint = rec.next_session_hint or last_hint
         return GoalState(
             name=name,
@@ -105,6 +111,7 @@ class Store:
             last_hint=last_hint,
             session_number=len(outcomes) + 1,
             recent_grades=recent_grades,
+            recent_by_concept=by_concept,
         )
 
     def save_session(

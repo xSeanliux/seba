@@ -152,6 +152,7 @@ class GoalState(BaseModel):
     last_hint: str | None = None
     session_number: int
     recent_grades: list[Grade] = Field(default_factory=list)
+    recent_by_concept: dict[str, list[Grade]] = Field(default_factory=dict)
 
 
 class GoalSummary(BaseModel):

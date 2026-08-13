@@ -16,7 +16,7 @@ def profile(max_reviews=6):
     )
 
 
-def state(concepts, items=(), notes="", recent=()):
+def state(concepts, items=(), notes="", recent=(), by_concept=None):
     return GoalState(
         name="prob",
         subject="probability",
@@ -25,6 +25,7 @@ def state(concepts, items=(), notes="", recent=()):
         notes=notes,
         session_number=2,
         recent_grades=list(recent),
+        recent_by_concept=by_concept or {},
     )
 
 
@@ -103,6 +104,16 @@ def test_briefing_scoped_notes_and_budget(tmp_path):
     s2 = state([Concept(id="a", name="A")], notes="## a\n- " + "x" * 9000 + "\n")
     a2 = build_agenda(s2, profile(), TODAY, tmp_path)
     assert len(a2.briefing) <= 4100 and "(older notes omitted)" in a2.briefing
+
+
+def test_briefing_lists_per_concept_recent_grades(tmp_path):
+    s = state(
+        [Concept(id="a", name="A")],
+        by_concept={"a": ["again", "hard", "good"], "zzz": ["easy"]},
+    )
+    b = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert "[a] recent: again, hard, good" in b
+    assert "zzz" not in b  # out of scope this session
 
 
 def test_resolve_excerpt(tmp_path):

@@ -98,6 +98,9 @@ def build_agenda(
         lines.append(f"Last session's hint: {state.last_hint}")
     notes = parse_notes(state.notes)
     for cid in sorted(scope):
+        grades = state.recent_by_concept.get(cid)
+        if grades:
+            lines.append(f"[{cid}] recent: " + ", ".join(grades))
         for note in notes.get(cid, [])[:3]:
             lines.append(f"[{cid}] {note}")
     briefing = "\n".join(lines)

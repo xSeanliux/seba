@@ -99,7 +99,12 @@ def _session(goal: str):
         )
         raise typer.Exit(1)
     state = store.load_goal(goal)
-    handler = ToolHandler(pending.agenda, state.syllabus, config.data_dir() / "sources")
+    handler = ToolHandler(
+        pending.agenda,
+        state.syllabus,
+        config.data_dir() / "sources",
+        _profile(state.subject).max_reviews_per_session,
+    )
     handler.record = pending.record
     return store, pending, handler, ppath
 
