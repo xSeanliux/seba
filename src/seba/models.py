@@ -2,7 +2,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 
 class ItemType(StrEnum):
@@ -135,18 +135,10 @@ class UpdateConcept(BaseModel):
     id: str
     status_change: Literal["started", "completed"] | None = None
     note: str | None = None
+    # Required on `completed`, but enforced in ToolHandler, not here: this model
+    # also parses historical outcomes written before the field existed, and a
+    # validator would make old sessions unreadable.
     evidence: str | None = None
-
-    @model_validator(mode="after")
-    def _completed_needs_evidence(self) -> "UpdateConcept":
-        # Naming the exchange moves the call from mastery attribution (which the
-        # model does badly) toward turn correctness (which it does well).
-        if self.status_change == "completed" and not (self.evidence or "").strip():
-            raise ValueError(
-                "completing a concept requires `evidence`: name the specific "
-                "exchange in this session that demonstrated the learner has it"
-            )
-        return self
 
 
 class EndSession(BaseModel):

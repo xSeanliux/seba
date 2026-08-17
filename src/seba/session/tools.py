@@ -86,6 +86,13 @@ class ToolHandler:
         if call.id not in {c.id for c in self.syllabus.concepts}:
             return f"unknown concept: '{call.id}'", True
         note = ""
+        if call.status_change == "completed" and not (call.evidence or "").strip():
+            # Naming the exchange moves the call from mastery attribution (which
+            # the model does badly) toward turn correctness (which it does well).
+            return (
+                "completing a concept requires --evidence: name the specific "
+                "exchange in this session that demonstrated the learner has it"
+            ), True
         if call.status_change == "completed" and call.id not in self.delayed_pass:
             if call.id in self.carded:
                 return (

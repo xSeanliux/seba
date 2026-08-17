@@ -1,6 +1,7 @@
 import subprocess
 from datetime import date
 
+import yaml
 import pytest
 from seba.models import (
     Concept,
@@ -194,3 +195,22 @@ def test_last_session_date_and_error_sites(store):
 def test_parse_notes():
     text = "## bayes\n- shaky on priors\n\n## sigma\n- fine\n"
     assert parse_notes(text) == {"bayes": ["- shaky on priors"], "sigma": ["- fine"]}
+
+
+def test_historical_completed_without_evidence_still_loads(tmp_path):
+    # `evidence` is required on new `completed` calls, but outcomes written
+    # before the field existed must stay readable — enforcing it on the model
+    # instead of the tool handler made every pre-existing goal unloadable.
+    store = Store(tmp_path)
+    syl = Syllabus(
+        goal="g", subject="probability", concepts=[Concept(id="a", name="A")]
+    )
+    store.create_goal("g", syl, "probability")
+    old = {
+        "reviews": [],
+        "concepts": [{"id": "a", "status_change": "completed", "note": None}],
+        "new_items": [],
+        "complete": True,
+    }
+    (tmp_path / "goals/g/sessions/001.outcomes.yaml").write_text(yaml.safe_dump(old))
+    assert store.load_goal("g").session_number == 2
