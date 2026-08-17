@@ -34,6 +34,11 @@ This installs the `seba` CLI (`uv tool install`) and links the `seba-tutor`
 skill into `~/.claude/skills/`. Reverse with `make uninstall` (or
 `./scripts/uninstall.sh`).
 
+Not a Claude Code plugin — `/plugin` doesn't manage it. To update, `git pull`
+then `make install`. The skill is a symlink and so is already live after the
+pull; the CLI is a copy and needs the reinstall, which is what `make install`
+is for.
+
 ## Use
 
 From any directory, run `claude`, then ask to study — or invoke `/seba-tutor`.
