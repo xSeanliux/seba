@@ -1,6 +1,7 @@
 import subprocess
 from datetime import date
 
+import yaml
 import pytest
 from seba.models import (
     Concept,
@@ -127,6 +128,89 @@ def test_malformed_items_named(store):
         store.load_goal("prob")
 
 
+def test_recent_grades_keyed_by_concept(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob")
+    record = SessionRecord(
+        reviews=[
+            GradeReview(id="it-1", grade="again"),
+            GradeReview(id="it-gone", grade="good"),
+        ],
+        complete=True,
+    )
+    store.save_session("prob", record, "t", gs.model_copy(update={"items": [item()]}))
+    gs2 = store.load_goal("prob")
+    assert gs2.recent_by_concept == {"bayes": ["again"]}  # deleted item skipped
+    assert gs2.recent_grades == ["again", "good"]  # global pool unchanged
+
+
+def test_delayed_pass_needs_a_later_session(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    started = SessionRecord(
+        reviews=[GradeReview(id="it-1", grade="good")],
+        concepts=[UpdateConcept(id="bayes", status_change="started")],
+        complete=True,
+    )
+    store.save_session("prob", started, "t", gs)
+    assert store.load_goal("prob").delayed_pass == set()  # same session doesn't count
+
+    store.save_session(
+        "prob",
+        SessionRecord(reviews=[GradeReview(id="it-1", grade="easy")], complete=True),
+        "t",
+        gs,
+    )
+    gs2 = store.load_goal("prob")
+    assert gs2.delayed_pass == {"bayes"}
+    assert gs2.recent_by_item == {"it-1": ["good", "easy"]}  # last two only
+
+
+def test_last_session_date_and_error_sites(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    store.save_session(
+        "prob",
+        SessionRecord(reviews=[GradeReview(id="it-1", grade="again")], complete=True),
+        "t",
+        gs,
+    )
+    gs2 = store.load_goal("prob")
+    assert gs2.last_session_date == date.today()  # stamped on save, not file mtime
+    assert gs2.last_session_errors == {"bayes"}
+    assert gs2.grades_by_concept == {"bayes": ["again"]}
+
+    # errors are the LAST session's only
+    store.save_session(
+        "prob",
+        SessionRecord(reviews=[GradeReview(id="it-1", grade="good")], complete=True),
+        "t",
+        gs,
+    )
+    gs3 = store.load_goal("prob")
+    assert gs3.last_session_errors == set()
+    assert gs3.grades_by_concept == {"bayes": ["again", "good"]}
+
+
 def test_parse_notes():
     text = "## bayes\n- shaky on priors\n\n## sigma\n- fine\n"
     assert parse_notes(text) == {"bayes": ["- shaky on priors"], "sigma": ["- fine"]}
+
+
+def test_historical_completed_without_evidence_still_loads(tmp_path):
+    # `evidence` is required on new `completed` calls, but outcomes written
+    # before the field existed must stay readable — enforcing it on the model
+    # instead of the tool handler made every pre-existing goal unloadable.
+    store = Store(tmp_path)
+    syl = Syllabus(
+        goal="g", subject="probability", concepts=[Concept(id="a", name="A")]
+    )
+    store.create_goal("g", syl, "probability")
+    old = {
+        "reviews": [],
+        "concepts": [{"id": "a", "status_change": "completed", "note": None}],
+        "new_items": [],
+        "complete": True,
+    }
+    (tmp_path / "goals/g/sessions/001.outcomes.yaml").write_text(yaml.safe_dump(old))
+    assert store.load_goal("g").session_number == 2

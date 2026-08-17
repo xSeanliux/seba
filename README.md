@@ -9,8 +9,11 @@ instruction-literature genre (Ptahhotep, Amenemope); the glyph 𓇼 also writes
 A long-term personal tutor, mid-relationship with each learner. It owns a
 curriculum (concept graph) and longitudinal learner state (FSRS review
 scheduling + per-concept notes), all stored as plain text in a git-backed data
-directory. Code owns state, scheduling, and validation; Claude Code owns
-dialogue and grading, recorded through validated outcome commands.
+directory. The graph is a revisable prior, not a settled plan: some edges advise
+rather than gate, a concept marked done reopens when its cards lapse, and
+marking one done needs evidence from a later session, not the tutor's word on
+the day. Code owns state, scheduling, and validation; Claude Code owns dialogue
+and grading, recorded through validated outcome commands.
 
 Sessions run inside Claude Code — your subscription, not a metered API key, no
 per-token cost. The `seba` CLI owns state, scheduling, and validation; the
@@ -30,6 +33,11 @@ make install          # or: ./scripts/install.sh
 This installs the `seba` CLI (`uv tool install`) and links the `seba-tutor`
 skill into `~/.claude/skills/`. Reverse with `make uninstall` (or
 `./scripts/uninstall.sh`).
+
+Not a Claude Code plugin — `/plugin` doesn't manage it. To update, `git pull`
+then `make install`. The skill is a symlink and so is already live after the
+pull; the CLI is a copy and needs the reinstall, which is what `make install`
+is for.
 
 ## Use
 

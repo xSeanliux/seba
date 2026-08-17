@@ -12,7 +12,15 @@ from seba.models import (
     UpdateConcept,
 )
 
-MINT_CAP = 10
+
+def mint_budget(max_reviews_per_session: int) -> int:
+    """New cards per session, budgeted against review capacity.
+
+    Minting faster than the session can review grows a due queue that never
+    drains; once the review cap binds it becomes the scheduler and FSRS's
+    intervals are silently overrun."""
+    return max(2, min(5, max_reviews_per_session // 2))
+
 
 TOOL_MODELS: dict[str, type[BaseModel]] = {
     "grade_review": GradeReview,
@@ -23,10 +31,22 @@ TOOL_MODELS: dict[str, type[BaseModel]] = {
 
 
 class ToolHandler:
-    def __init__(self, agenda: Agenda, syllabus: Syllabus, sources_dir: Path):
+    def __init__(
+        self,
+        agenda: Agenda,
+        syllabus: Syllabus,
+        sources_dir: Path,
+        max_reviews_per_session: int,
+        delayed_pass: set[str],
+        carded: set[str],
+    ):
         self.agenda = agenda
         self.syllabus = syllabus
         self.sources_dir = sources_dir
+        self.max_reviews = max_reviews_per_session
+        self.delayed_pass = delayed_pass
+        self.carded = carded
+        self.mint_budget = mint_budget(max_reviews_per_session)
         self.record = SessionRecord()
 
     def missing_grades(self) -> list[str]:
@@ -52,8 +72,11 @@ class ToolHandler:
         return "recorded", False
 
     def _mint_item(self, call: MintItem) -> tuple[str, bool]:
-        if len(self.record.new_items) >= MINT_CAP:
-            return f"mint cap reached ({MINT_CAP}); no more cards this session", True
+        if len(self.record.new_items) >= self.mint_budget:
+            return (
+                f"mint budget reached ({self.mint_budget} this session); "
+                f"review capacity is {self.max_reviews}/session"
+            ), True
         if call.concept not in {c.id for c in self.syllabus.concepts}:
             return f"unknown concept: '{call.concept}'", True
         self.record.new_items.append(call)
@@ -62,8 +85,26 @@ class ToolHandler:
     def _update_concept(self, call: UpdateConcept) -> tuple[str, bool]:
         if call.id not in {c.id for c in self.syllabus.concepts}:
             return f"unknown concept: '{call.id}'", True
+        note = ""
+        if call.status_change == "completed" and not (call.evidence or "").strip():
+            # Naming the exchange moves the call from mastery attribution (which
+            # the model does badly) toward turn correctness (which it does well).
+            return (
+                "completing a concept requires --evidence: name the specific "
+                "exchange in this session that demonstrated the learner has it"
+            ), True
+        if call.status_change == "completed" and call.id not in self.delayed_pass:
+            if call.id in self.carded:
+                return (
+                    f"'{call.id}' has no unaided pass in a later session; it needs "
+                    "one good/easy review of one of its cards after the session "
+                    "where teaching started"
+                ), True
+            # No cards means the delayed check can never be satisfied; allowing it
+            # unremarked would hide that this completion rests on the tutor alone.
+            note = " (no cards for this concept, so the delayed check was skipped)"
         self.record.concepts.append(call)
-        return "recorded", False
+        return "recorded" + note, False
 
     def _end_session(self, call: EndSession) -> tuple[str, bool]:
         if self.record.complete:

@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from seba.models import GoalState, GoalSummary, Item, SessionRecord, Syllabus
+from seba.models import GoalState, GoalSummary, Grade, Item, SessionRecord, Syllabus
 from seba.syllabus.graph import SyllabusError, load_syllabus
 
 
@@ -91,11 +91,41 @@ class Store:
             raise StoreError(str(e)) from e
         items = self._load_items(gdir / "items.jsonl")
         outcomes = self._outcomes_files(name)
+        concept_of = {i.id: i.concept for i in items}
         last_hint, recent_grades = None, []
-        for path in outcomes[-3:]:
+        by_concept: dict[str, list[Grade]] = {}
+        all_by_concept: dict[str, list[Grade]] = {}
+        by_item: dict[str, list[Grade]] = {}
+        started_at: dict[str, int] = {}  # session a concept first went in-progress
+        passed_at: dict[str, list[int]] = {}  # sessions with a good/easy card review
+        last_errors: set[str] = set()
+        last_date: date | None = None
+        # ponytail: re-reads every outcomes file per load; sessions are small and
+        # few. Cache or a derived index only if a goal's history gets long.
+        for n, path in enumerate(outcomes, 1):
             rec = SessionRecord.model_validate(yaml.safe_load(path.read_text()))
-            recent_grades.extend(r.grade for r in rec.reviews)
-            last_hint = rec.next_session_hint or last_hint
+            recent = n > len(outcomes) - 3
+            last = n == len(outcomes)
+            if last:
+                last_date, last_errors = rec.session_date, set()
+            for r in rec.reviews:
+                by_item.setdefault(r.id, []).append(r.grade)
+                cid = concept_of.get(r.id)  # item may since have been deleted
+                if cid is not None:
+                    all_by_concept.setdefault(cid, []).append(r.grade)
+                    if r.grade in (Grade.GOOD, Grade.EASY):
+                        passed_at.setdefault(cid, []).append(n)
+                    elif last and r.grade in (Grade.AGAIN, Grade.HARD):
+                        last_errors.add(cid)
+                if recent:
+                    recent_grades.append(r.grade)
+                    if cid is not None:
+                        by_concept.setdefault(cid, []).append(r.grade)
+            for c in rec.concepts:
+                if c.status_change == "started":
+                    started_at.setdefault(c.id, n)
+            if recent:
+                last_hint = rec.next_session_hint or last_hint
         return GoalState(
             name=name,
             subject=meta["subject"],
@@ -105,12 +135,28 @@ class Store:
             last_hint=last_hint,
             session_number=len(outcomes) + 1,
             recent_grades=recent_grades,
+            recent_by_concept=by_concept,
+            recent_by_item={i: g[-2:] for i, g in by_item.items()},
+            grades_by_concept=all_by_concept,
+            last_session_errors=last_errors,
+            started_at=started_at,
+            last_session_date=last_date,
+            delayed_pass={
+                cid
+                for cid, sessions in passed_at.items()
+                if cid in started_at and max(sessions) > started_at[cid]
+            },
         )
 
     def save_session(
         self, name: str, record: SessionRecord, transcript: str, updated: GoalState
     ) -> None:
         gdir = self._goal_dir(name)
+        # The only durable record of when a session happened; mtime doesn't survive
+        # a clone of the data repo, and the lapse check needs a real date.
+        record = record.model_copy(
+            update={"session_date": record.session_date or date.today()}
+        )
         n = f"{len(self._outcomes_files(name)) + 1:03d}"
         sdir = gdir / "sessions"
         marker = "" if record.complete else "**INCOMPLETE**\n\n"

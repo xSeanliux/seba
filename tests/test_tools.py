@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 from seba.models import Agenda, Concept, ReviewItem, Syllabus
-from seba.session.tools import ToolHandler
+from seba.session.tools import ToolHandler, mint_budget
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def handler(tmp_path: Path):
     syllabus = Syllabus(
         goal="g", subject="probability", concepts=[Concept(id="bayes", name="Bayes")]
     )
-    return ToolHandler(agenda, syllabus, tmp_path)
+    return ToolHandler(agenda, syllabus, tmp_path, 6, set(), {"bayes"})
 
 
 def test_grade_review_ok_and_duplicate(handler):
@@ -43,17 +43,23 @@ def test_grade_review_bad_args(handler):
     assert err
 
 
-def test_mint_cap(handler):
-    for i in range(10):
+def test_mint_budget_tracks_review_capacity(handler):
+    assert (mint_budget(6), mint_budget(20), mint_budget(2), mint_budget(0)) == (
+        3,
+        5,
+        2,
+        2,
+    )
+    for i in range(3):  # handler is built with 6 reviews/session -> budget 3
         _, err = handler.handle(
             "mint_item",
             {"concept": "bayes", "type": "recall", "front": f"f{i}", "back": "b"},
         )
         assert not err
     text, err = handler.handle(
-        "mint_item", {"concept": "bayes", "type": "recall", "front": "f10", "back": "b"}
+        "mint_item", {"concept": "bayes", "type": "recall", "front": "f3", "back": "b"}
     )
-    assert err and "cap" in text
+    assert err and "3 this session" in text and "6/session" in text
 
 
 def test_mint_unknown_concept(handler):
@@ -80,6 +86,45 @@ def test_missing_grades(handler):
     assert handler.missing_grades() == ["it-1", "it-2"]
     handler.handle("grade_review", {"id": "it-1", "grade": "again"})
     assert handler.missing_grades() == ["it-2"]
+
+
+def test_completed_needs_delayed_evidence(handler):
+    text, err = handler.handle(
+        "update_concept",
+        {"id": "bayes", "status_change": "completed", "evidence": "solved 3 unaided"},
+    )
+    assert err and "no unaided pass in a later session" in text
+    assert not handler.record.concepts
+    # started is never gated
+    _, err2 = handler.handle(
+        "update_concept", {"id": "bayes", "status_change": "started"}
+    )
+    assert not err2
+
+
+def test_completed_allowed_after_a_later_pass(handler):
+    handler.delayed_pass = {"bayes"}
+    text, err = handler.handle(
+        "update_concept",
+        {"id": "bayes", "status_change": "completed", "evidence": "solved 3 unaided"},
+    )
+    assert not err and text == "recorded"
+
+
+def test_completed_needs_evidence_field(handler):
+    text, err = handler.handle(
+        "update_concept", {"id": "bayes", "status_change": "completed"}
+    )
+    assert err and "evidence" in text
+
+
+def test_concept_without_cards_bypasses_the_delayed_check(handler):
+    handler.carded = set()
+    text, err = handler.handle(
+        "update_concept",
+        {"id": "bayes", "status_change": "completed", "evidence": "derived it aloud"},
+    )
+    assert not err and "no cards" in text
 
 
 def test_unknown_tool(handler):
