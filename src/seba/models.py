@@ -2,7 +2,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ItemType(StrEnum):
@@ -66,6 +66,15 @@ class GoalMeta(BaseModel):
     subject: str
     settings: GoalSettings = Field(default_factory=GoalSettings)
     emphasis: dict[str, Emphasis] = Field(default_factory=dict)
+
+    @field_validator("emphasis", mode="before")
+    @classmethod
+    def _normal_is_no_entry(cls, v: dict[str, str] | str) -> dict[str, str] | str:
+        # `normal` is a level `tune` accepts, so a hand edit may write it; it
+        # means no entry. Anything malformed is left to the field's validation.
+        if isinstance(v, dict):
+            return {cid: e for cid, e in v.items() if e != "normal"}
+        return v
 
 
 class Concept(BaseModel):
