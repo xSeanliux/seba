@@ -146,7 +146,7 @@ def test_recent_grades_keyed_by_concept(store):
     assert gs2.recent_grades == ["again", "good"]  # global pool unchanged
 
 
-def test_delayed_pass_needs_a_later_session(store):
+def test_passes_count_later_sessions(store):
     store.create_goal("prob", syl(), "probability")
     gs = store.load_goal("prob").model_copy(update={"items": [item()]})
     started = SessionRecord(
@@ -155,17 +155,59 @@ def test_delayed_pass_needs_a_later_session(store):
         complete=True,
     )
     store.save_session("prob", started, "t", gs)
-    assert store.load_goal("prob").delayed_pass == set()  # same session doesn't count
+    assert store.load_goal("prob").passes == {"bayes": 0}  # same session: no
 
+    _save(store, gs, GradeReview(id="it-1", grade="easy"))
+    gs2 = store.load_goal("prob")
+    assert gs2.passes == {"bayes": 1}
+    assert gs2.again_runs == {}
+
+    _save(store, gs, GradeReview(id="it-1", grade="hard", note="one hint"))
+    assert store.load_goal("prob").passes == {"bayes": 1}  # a pass is good or easy
+
+    again_started = SessionRecord(
+        reviews=[GradeReview(id="it-1", grade="good")],
+        concepts=[UpdateConcept(id="bayes", status_change="started")],
+        complete=True,
+    )
+    store.save_session("prob", again_started, "t", gs)
+    assert store.load_goal("prob").passes == {"bayes": 2}  # re-recorded start
+
+
+def test_reopening_restarts_the_pass_count(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
     store.save_session(
         "prob",
-        SessionRecord(reviews=[GradeReview(id="it-1", grade="easy")], complete=True),
+        SessionRecord(
+            concepts=[UpdateConcept(id="bayes", status_change="started")],
+            complete=True,
+        ),
         "t",
         gs,
     )
-    gs2 = store.load_goal("prob")
-    assert gs2.delayed_pass == {"bayes"}
-    assert gs2.again_runs == {}
+    _save(store, gs, GradeReview(id="it-1", grade="good"))
+    assert store.load_goal("prob").passes == {"bayes": 1}
+    store.save_session(
+        "prob",
+        SessionRecord(
+            reviews=[GradeReview(id="it-1", grade="good")],
+            concepts=[UpdateConcept(id="bayes", status_change="reopened")],
+            complete=True,
+        ),
+        "t",
+        gs,
+    )
+    assert store.load_goal("prob").passes == {"bayes": 0}
+    _save(store, gs, GradeReview(id="it-1", grade="good"))
+    assert store.load_goal("prob").passes == {"bayes": 1}
+
+
+def test_a_concept_never_started_has_no_passes(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    _save(store, gs, GradeReview(id="it-1", grade="good"))
+    assert store.load_goal("prob").passes == {}
 
 
 def test_last_session_date_and_error_sites(store):

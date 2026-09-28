@@ -117,7 +117,8 @@ def _session(goal: str):
         state.syllabus,
         config.data_dir() / "sources",
         _profile(state.subject).max_reviews_per_session,
-        state.delayed_pass,
+        state.passes,
+        state.settings.completion_passes,
         {i.concept for i in state.items},
     )
     handler.record = pending.record

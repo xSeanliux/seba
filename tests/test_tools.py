@@ -23,7 +23,7 @@ def handler(tmp_path: Path):
     syllabus = Syllabus(
         goal="g", subject="probability", concepts=[Concept(id="bayes", name="Bayes")]
     )
-    return ToolHandler(agenda, syllabus, tmp_path, 6, set(), {"bayes"})
+    return ToolHandler(agenda, syllabus, tmp_path, 6, {}, 1, {"bayes"})
 
 
 def test_grade_review_ok_and_duplicate(handler):
@@ -112,12 +112,12 @@ def test_other_grades_need_no_note(handler, grade):
     assert not err
 
 
-def test_completed_needs_delayed_evidence(handler):
-    text, err = handler.handle(
-        "update_concept",
-        {"id": "bayes", "status_change": "completed", "evidence": "solved 3 unaided"},
-    )
-    assert err and "no unaided pass in a later session" in text
+COMPLETE = {"id": "bayes", "status_change": "completed", "evidence": "solved 3 unaided"}
+
+
+def test_completed_needs_a_later_pass(handler):
+    text, err = handler.handle("update_concept", COMPLETE)
+    assert err and "0 of 1" in text and "later session" in text
     assert not handler.record.concepts
     # started is never gated
     _, err2 = handler.handle(
@@ -127,12 +127,19 @@ def test_completed_needs_delayed_evidence(handler):
 
 
 def test_completed_allowed_after_a_later_pass(handler):
-    handler.delayed_pass = {"bayes"}
-    text, err = handler.handle(
-        "update_concept",
-        {"id": "bayes", "status_change": "completed", "evidence": "solved 3 unaided"},
-    )
+    handler.passes = {"bayes": 1}
+    text, err = handler.handle("update_concept", COMPLETE)
     assert not err and text == "recorded"
+
+
+def test_completion_passes_raises_the_bar(handler):
+    handler.completion_passes = 2
+    handler.passes = {"bayes": 1}
+    text, err = handler.handle("update_concept", COMPLETE)
+    assert err and "1 of 2" in text
+    handler.passes = {"bayes": 2}
+    _, err2 = handler.handle("update_concept", COMPLETE)
+    assert not err2
 
 
 def test_completed_needs_evidence_field(handler):

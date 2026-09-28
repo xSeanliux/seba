@@ -219,9 +219,10 @@ class GoalState(BaseModel):
         default_factory=dict
     )  # session first in-progress
     last_session_date: date | None = None
-    # Concepts with a good/easy card review in a session strictly after the one
-    # where teaching started — the delayed, unaided check `completed` is gated on.
-    delayed_pass: set[str] = Field(default_factory=set)
+    # Per concept, the distinct sessions with a good/easy card review, strictly
+    # after the one where teaching started (or where it was last reopened) —
+    # the delayed, unaided check `completed` is gated on.
+    passes: dict[str, int] = Field(default_factory=dict)
 
 
 class GoalSummary(BaseModel):

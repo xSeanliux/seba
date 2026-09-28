@@ -39,14 +39,16 @@ class ToolHandler:
         syllabus: Syllabus,
         sources_dir: Path,
         max_reviews_per_session: int,
-        delayed_pass: set[str],
+        passes: dict[str, int],
+        completion_passes: int,
         carded: set[str],
     ):
         self.agenda = agenda
         self.syllabus = syllabus
         self.sources_dir = sources_dir
         self.max_reviews = max_reviews_per_session
-        self.delayed_pass = delayed_pass
+        self.passes = passes
+        self.completion_passes = completion_passes
         self.carded = carded
         self.mint_budget = mint_budget(max_reviews_per_session)
         self.record = SessionRecord()
@@ -114,12 +116,14 @@ class ToolHandler:
                 "completing a concept requires --evidence: name the specific "
                 "exchange in this session that demonstrated the learner has it"
             ), True
-        if call.status_change == "completed" and call.id not in self.delayed_pass:
+        have = self.passes.get(call.id, 0)
+        if call.status_change == "completed" and have < self.completion_passes:
             if call.id in self.carded:
                 return (
-                    f"'{call.id}' has no unaided pass in a later session; it needs "
-                    "one good/easy review of one of its cards after the session "
-                    "where teaching started"
+                    f"'{call.id}' has {have} of {self.completion_passes} unaided "
+                    "pass(es) in a later session; each is a good/easy review of "
+                    "one of its cards, in a session after the one where teaching "
+                    "started or the concept was reopened"
                 ), True
             # No cards means the delayed check can never be satisfied; allowing it
             # unremarked would hide that this completion rests on the tutor alone.
