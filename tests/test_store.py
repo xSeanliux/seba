@@ -319,6 +319,18 @@ def test_save_tuning_does_not_commit_when_nothing_changed(store):
     assert _commits(store) == before
 
 
+def test_save_tuning_leaves_other_staged_files_alone(store):
+    store.create_goal("prob", syl(), "probability")
+    store.save_tuning("prob", GoalSettings(desired_retention=0.85), {}, [])
+    (store.data_dir / "stray.txt").write_text("x")
+    subprocess.run(["git", "add", "stray.txt"], cwd=store.data_dir, check=True)
+    before = _commits(store)
+    assert (
+        store.save_tuning("prob", GoalSettings(desired_retention=0.85), {}, []) is False
+    )
+    assert _commits(store) == before
+
+
 def test_save_tuning_keeps_unknown_keys(store):
     store.create_goal("prob", syl(), "probability")
     path = _goal_yaml(store)

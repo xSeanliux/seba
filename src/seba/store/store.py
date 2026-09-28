@@ -117,12 +117,17 @@ class Store:
         )
         path.write_text(yaml.safe_dump(meta.model_dump(mode="json"), sort_keys=False))
         self._write_items(gdir, items)
-        self._git("add", f"goals/{name}/goal.yaml", f"goals/{name}/items.jsonl")
+        paths = (f"goals/{name}/goal.yaml", f"goals/{name}/items.jsonl")
+        self._git("add", *paths)
         staged = subprocess.run(
-            ["git", "diff", "--cached", "--quiet"], cwd=self.data_dir
+            ["git", "diff", "--cached", "--quiet", "--", *paths],
+            cwd=self.data_dir,
+            capture_output=True,
         )
         if staged.returncode == 0:
             return False
+        if staged.returncode != 1:
+            raise StoreError(f"git diff failed: {staged.stderr.decode().strip()}")
         self._git("commit", "-m", f"{name}: tuned")
         return True
 
