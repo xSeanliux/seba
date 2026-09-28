@@ -35,7 +35,8 @@ deterministic half only through the CLI, directed by the `seba-tutor` skill.
   `syllabus` is a sibling used by `cli`/`store`. No circular imports.
 - **`ToolHandler` owns all outcome validation.** Never add a second validator
   or default silently. Grades are `again | hard | good | easy | skipped`;
-  concept status moves `unseen → in-progress → done` one step forward only;
+  concept status moves `unseen → in-progress → done` one step forward only,
+  except `reopened` (`done → in-progress`);
   `mint_item` is capped at 10 per session.
 - **Fail loudly.** A malformed state file raises an error naming the file; a
   CLI validation failure prints the reason to stderr and exits non-zero.
@@ -65,9 +66,10 @@ is the exception).
 |---|---|
 | `seba status` | list goals with due counts |
 | `seba start GOAL` | begin/resume a session; prints the agenda YAML |
-| `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record a review grade |
+| `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record a review grade; `--note` is required on `hard` and `again` |
 | `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create a spaced-repetition card |
-| `seba concept GOAL ID [--status started\|completed] [--note TEXT]` | record concept progress or a note |
+| `seba concept GOAL ID [--status started\|completed\|reopened] [--note TEXT]` | record concept progress or a note; `reopened` is only for a done concept, once the learner has agreed |
+| `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more]` | no flags: print the goal's settings and emphasis; with flags: change them. Works during a session |
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session |
 | `seba abandon GOAL [--discard]` | quit early: save as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a drafted syllabus YAML |

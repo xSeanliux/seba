@@ -17,9 +17,10 @@ record does not exist next session.
 |---|---|
 | `seba status` | list goals with due counts |
 | `seba start GOAL` | begin/resume a session; prints YAML: `agenda`, `subject_style`, `already_graded`, `ungraded_reviews`, `minted_so_far` |
-| `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record a review grade the moment its exchange resolves |
+| `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record a review grade the moment its exchange resolves; `--note` is **required** on `hard` and `again` |
 | `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create a spaced-repetition card (small per-session budget, set by the subject's review capacity — it tells you the number when you hit it) |
-| `seba concept GOAL ID [--status started\|completed] [--evidence TEXT] [--note TEXT]` | record concept progress or a misconception/strength note; `completed` **requires** `--evidence` naming the exchange that showed mastery |
+| `seba concept GOAL ID [--status started\|completed\|reopened] [--evidence TEXT] [--note TEXT]` | record concept progress or a misconception/strength note; `completed` **requires** `--evidence` naming the exchange that showed mastery; `reopened` is only for a done concept, and only once the learner has agreed |
+| `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more]` | no flags: print the goal's settings and emphasis; with flags: change them and print what changed. Works during a session |
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session (refuses while reviews are ungraded) |
 | `seba abandon GOAL [--discard]` | learner quits early: save what was recorded as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a syllabus YAML you drafted |
@@ -125,10 +126,16 @@ don't offer to. Reviews and recording work the same in all three.
   honestly, treat the forgetting as information about scheduling rather than
   about them. Close early on a win instead of grinding the whole queue.
 
-**Reopened concepts.** A card graded `again` reopens its concept from done to
-in-progress on its own, so a concept you finished may be today's
-`teach_concept`. Expected — that's the mechanism working, not a failure. Pick up
-where the card broke, don't re-teach from zero, and don't commiserate.
+**Nothing reopens by itself.** A done concept stays done while its cards are
+failing; the scheduler brings the failing card back and the `slipped:` line
+keeps it in front of you. When the repair isn't holding, say so and propose
+re-teaching: "bayes has slipped twice running — want to reopen it?" Only on a
+yes: `seba concept GOAL ID --status reopened`. That call is what starts it
+again — don't also record `--status started` (refused: the concept was done
+when the session began). It is back in progress, so next session it takes the
+teaching slot ahead of new concepts. Pick up where the card broke, don't
+re-teach from zero, and don't commiserate. Its passes start again from zero:
+it can't be completed in the session that reopened it.
 
 ## Session flow
 
@@ -146,19 +153,43 @@ where the card broke, don't re-teach from zero, and don't commiserate.
    - `soft prereqs not yet done (advisory): …` — don't gate on these; touch one
      only if the learner stumbles somewhere it would explain.
    - `[concept] recent: again, hard, good` — grades over the last three sessions,
-     oldest first. A trailing `again` means open there, gently.
+     oldest first. For a card that came back `again`, the `slipped:` line has
+     the detail.
+   - `slipped: [concept] ITEM_ID, N session(s) running — "note". …` — that card
+     came back `again` last session, N sessions in a row. Open there. At two or
+     more sessions running, **propose re-teaching** the concept and let the
+     learner decide (see Session types).
+   - `hard: [concept] ITEM_ID, passed with help — "note". …` — touch on what the
+     help was for, in conversation. Don't drill it: the schedule is unchanged.
+   - `emphasis: [concept] more|less — …` — the learner asked for this. Don't
+     second-guess it, and don't change it without them.
+   - `next: a, b — …` — see `agenda.next_concepts` under step 4.
    - `[concept] MISCONCEPTION: …` — they have actually shown it. Probe; don't
      assume it's gone.
 3. **Reviews first**, woven in conversationally — not as a quiz sheet. For each
    item in `agenda.review_items`: pose the front, get a REAL answer attempt
    before revealing anything, give corrective feedback naming any misconception,
    then IMMEDIATELY run `seba grade`. Rubric — grade what they did **unaided**:
-   - `again` — wrong, or no recall
-   - `hard` — correct but with significant hesitation, or after any hint above L2
+   - `again` — wrong, or no recall. `--note` says what went wrong.
+   - `hard` — **correct, but only with significant help** (any hint above L2).
+     It is a pass: the interval still grows. `--note` says what the help was
+     for. Slow but unaided is `good`, not `hard`.
    - `good` — correct and unaided
    - `easy` — instant, confident, unaided
    - `skipped` — only for items the session never reached
+
+   `seba grade` refuses `hard` and `again` without a note. Write the note for
+   the tutor who opens the next session: "confused the identity element with
+   the inverse", not "struggled". It is shown inside one line of the next
+   briefing, so write **one sentence, no line breaks**.
 4. **Teach** `agenda.teach_concept` (null → skip to 5; see Session types).
+   `agenda.next_concepts` lists follow-ons when the goal allows more than one
+   concept a session. It is a ceiling, never a target: start the next only once
+   the current concept reaches a stopping point, and stopping after one is
+   always fine. `--status started` and a first card apply to each one you begin,
+   and so does everything below. A follow-on's `source_excerpts` may be empty
+   although it has `sources` — the pre-load budget went to the first concept;
+   fetch its slices yourself as below.
    Ground the lesson in its sources — teach from the source, not from memory:
    - `source_excerpts` is text Seba **pre-loaded** for local-text sources (already
      section-sliced and 16k-capped) — use it directly.
@@ -249,11 +280,13 @@ where the card broke, don't re-teach from zero, and don't commiserate.
    they're aiming at: **two correct unaided applications, at least one in a
    context they haven't seen it in.** `--evidence` is required and names the
    actual exchange ("derived P(A|B) unaided on the taxi problem, new framing"),
-   not a verdict ("learner understands it"). Seba also refuses `completed` unless
-   one of the concept's cards came back `good`/`easy` in a session **later** than
-   the one teaching started — so **completing is normally a later-session
-   event**. Don't plan to teach and complete in one sitting: teach, mint, let the
-   card prove it next time. (No cards means the check is skipped and the response
+   not a verdict ("learner understands it"). Seba also refuses `completed` until
+   the concept has as many passes as the goal's `completion_passes` (default
+   one). A pass is a session **later** than the one where teaching started or
+   the concept was reopened, in which one of its cards came back `good`/`easy`.
+   The refusal says how many passes it has. So **completing is a later-session event**.
+   Don't plan to teach and complete in one sitting: teach, mint, let the card
+   prove it next time. (No cards means the check is skipped and the response
    says so — that's a gap, not a pass.)
 6. Tangents are welcome — follow them, and record anything durable.
 7. **Close on a success.** If the last practice item failed, don't stop there —
@@ -268,7 +301,22 @@ where the card broke, don't re-teach from zero, and don't commiserate.
 9. **Then negotiate.** State your read and invite disagreement: "my read — X
    solid, Y shaky, Z untouched. Fair?" If they disagree, record the
    *disagreement*, not just where you landed ("learner rates Y solid; I don't") —
-   the cheapest correction there is on an over-confident completion. Then
+   the cheapest correction there is on an over-confident completion.
+
+   **Tuning is the learner's call.** What they say comes first, grades second.
+   Nothing tunes itself. Use grades to decide what to *propose*: "functors came
+   back `again` twice — want it more often?" Then act on their answer:
+   - one concept → `seba tune GOAL --concept ID --emphasis more|less|normal`.
+     `more` also makes its cards due now.
+   - everything coming back too often, or not often enough →
+     `--retention` (0.70–0.97, default 0.9; lower means longer gaps).
+   - cards vanishing for months → `--max-interval DAYS` (default 180).
+   - sessions too short or too long → `--concepts-per-session N` (1–5).
+
+   **Always say which setting changed and to what**, in the same turn. Never
+   change one silently, and never to make a session go smoother.
+
+   Then
    `seba end GOAL --summary "3–6 sentences" --hint "concrete next-session hint"`.
    The hint is a **procedure and a stopping rule**, never a quantity: "read §3.2
    aloud, stop at every word you hesitate on, write those down" — not "20
