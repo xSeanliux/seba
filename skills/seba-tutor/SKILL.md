@@ -128,8 +128,11 @@ don't offer to. Reviews and recording work the same in all three.
 
 **Nothing reopens by itself.** A done concept stays done while its cards are
 failing; the scheduler brings the failing card back and the `slipped:` line
-keeps it in front of you. When the repair isn't holding, say so and propose
-re-teaching: "bayes has slipped twice running — want to reopen it?" Only on a
+keeps it in front of you. Reopening is only for a done concept: a slip on a
+concept still in progress is repaired in the session, with no command
+(`--status reopened` refuses it). When a done concept's repair isn't holding,
+say so and propose re-teaching: "bayes has slipped twice running — want to
+reopen it?" Only on a
 yes: `seba concept GOAL ID --status reopened`. That call is what starts it
 again — don't also record `--status started` (refused: the concept was done
 when the session began). It is back in progress, so next session it takes the
@@ -156,9 +159,12 @@ it can't be completed in the session that reopened it.
      oldest first. For a card that came back `again`, the `slipped:` line has
      the detail.
    - `slipped: [concept] ITEM_ID, N session(s) running — "note". …` — that card
-     came back `again` last session, N sessions in a row. Open there. At two or
-     more sessions running, **propose re-teaching** the concept and let the
-     learner decide (see Session types).
+     came back `again` last session, N sessions in a row. Open there. If the
+     concept is done and the line says two or more sessions running, **propose
+     re-teaching** it and let the learner decide (see Session types). If the
+     line ends `Still in progress: repair it this session.`, the concept isn't
+     done: repair the card in this session. There is nothing to reopen and no
+     command to run.
    - `hard: [concept] ITEM_ID, passed with help — "note". …` — touch on what the
      help was for, in conversation. Don't drill it: the schedule is unchanged.
    - `emphasis: [concept] more|less — …` — the learner asked for this. Don't

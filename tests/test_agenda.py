@@ -1,5 +1,6 @@
 from datetime import date
 
+import pytest
 from seba.models import (
     Concept,
     Emphasis,
@@ -290,6 +291,25 @@ def test_slipped_line_for_a_first_slip_without_a_note(tmp_path):
     )
     briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
     assert "slipped: [a] it-a, 1 session running. Propose" in briefing
+
+
+@pytest.mark.parametrize(
+    "status,ending",
+    [
+        ("done", "Propose re-teaching if the repair doesn't hold."),
+        ("in-progress", "Still in progress: repair it this session."),
+        ("unseen", "Still in progress: repair it this session."),
+    ],
+)
+def test_slipped_line_ends_by_the_concepts_status(tmp_path, status, ending):
+    s = state(
+        [Concept(id="a", name="A", status=status)],
+        [item("it-a", concept="a", due="2099-01-01T00:00:00+00:00")],
+        last_trouble=[GradeReview(id="it-a", grade="again", note="n")],
+        again_runs={"it-a": 2},
+    )
+    briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert f'slipped: [a] it-a, 2 sessions running — "n". {ending}' in briefing
 
 
 def test_hard_line_carries_the_note(tmp_path):

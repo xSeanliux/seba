@@ -124,6 +124,7 @@ def _trouble_lines(state: GoalState) -> list[str]:
     """What went wrong last session, in the tutor's own words. Reporting only:
     the scheduler has already decided when each of these cards comes back."""
     concept_of = {i.id: i.concept for i in state.items}
+    done = {c.id for c in state.syllabus.concepts if c.status == "done"}
     lines = []
     for r in state.last_trouble:
         cid = concept_of.get(r.id)
@@ -133,9 +134,16 @@ def _trouble_lines(state: GoalState) -> list[str]:
         said = f' — "{note}"' if note else ""
         if r.grade == Grade.AGAIN:
             n = state.again_runs.get(r.id, 1)
+            # Only a done concept can be reopened; one still being taught (or
+            # carded before teaching started) is repaired where it stands.
+            then = (
+                "Propose re-teaching if the repair doesn't hold."
+                if cid in done
+                else "Still in progress: repair it this session."
+            )
             lines.append(
                 f"slipped: [{cid}] {r.id}, {n} session{'' if n == 1 else 's'} "
-                f"running{said}. Propose re-teaching if the repair doesn't hold."
+                f"running{said}. {then}"
             )
         else:
             lines.append(
