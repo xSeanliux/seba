@@ -354,6 +354,15 @@ def test_hard_line_carries_the_note(tmp_path):
     assert a.review_items == []  # a `hard` pulls nothing in
 
 
+@pytest.mark.parametrize("grade", ["again", "hard"])
+def test_a_note_is_shown_on_one_line(tmp_path, grade):
+    note = "needed\nthe  formula\n\tagain"
+    s = trouble_state(last_trouble=[GradeReview(id="it-a", grade=grade, note=note)])
+    lines = build_agenda(s, profile(), TODAY, tmp_path).briefing.splitlines()
+    [line] = [x for x in lines if "it-a" in x]
+    assert '— "needed the formula again".' in line
+
+
 def test_trouble_on_a_deleted_card_is_skipped(tmp_path):
     s = trouble_state(last_trouble=[GradeReview(id="it-gone", grade="again", note="n")])
     assert "slipped:" not in build_agenda(s, profile(), TODAY, tmp_path).briefing

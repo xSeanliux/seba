@@ -264,7 +264,9 @@ def test_a_hard_note_reaches_the_next_briefing(monkeypatch, tmp_path):
     seed(env(monkeypatch, tmp_path))
     _finish_session("hard", "--note", AWKWARD)
     agenda = _briefing()
-    assert f'hard: [bayes] it-1, passed with help — "{AWKWARD}".' in agenda["briefing"]
+    # shown on one line; the quotes and the non-ASCII text survive
+    one_line = 'mixed up "σ-algebra" with a topology — perché?'
+    assert f'hard: [bayes] it-1, passed with help — "{one_line}".' in agenda["briefing"]
     # a `hard`-only session pulls no extra cards into the next
     assert agenda["review_items"] == []
 

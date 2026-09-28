@@ -130,7 +130,7 @@ def _trouble_lines(state: GoalState) -> list[str]:
         cid = concept_of.get(r.id)
         if cid is None:
             continue  # card since deleted
-        note = (r.note or "").strip()
+        note = " ".join((r.note or "").split())  # a newline would split the line
         said = f' — "{note}"' if note else ""
         if r.grade == Grade.AGAIN:
             n = state.again_runs.get(r.id, 1)
