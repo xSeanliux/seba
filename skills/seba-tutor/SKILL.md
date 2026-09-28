@@ -20,7 +20,7 @@ record does not exist next session.
 | `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record a review grade the moment its exchange resolves; `--note` is **required** on `hard` and `again` |
 | `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create a spaced-repetition card (small per-session budget, set by the subject's review capacity — it tells you the number when you hit it) |
 | `seba concept GOAL ID [--status started\|completed\|reopened] [--evidence TEXT] [--note TEXT]` | record concept progress or a misconception/strength note; `completed` **requires** `--evidence` naming the exchange that showed mastery; `reopened` is only for a done concept, and only once the learner has agreed |
-| `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more]` | no flags: print the goal's settings and emphasis; with flags: change them and print what changed. Works during a session |
+| `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more]` | no flags: print the goal's settings and emphasis; with flags: change them and print what changed. Works during a session, but this session's review list and follow-on concepts were fixed at `seba start` (see step 9) |
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session (refuses while reviews are ungraded) |
 | `seba abandon GOAL [--discard]` | learner quits early: save what was recorded as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a syllabus YAML you drafted |
@@ -138,7 +138,7 @@ again — don't also record `--status started` (refused: the concept was done
 when the session began). It is back in progress, so next session it takes the
 teaching slot ahead of new concepts. Pick up where the card broke, don't
 re-teach from zero, and don't commiserate. Its passes start again from zero:
-it can't be completed in the session that reopened it.
+unless it has no cards, it can't be completed in the session that reopened it.
 
 ## Session flow
 
@@ -156,15 +156,16 @@ it can't be completed in the session that reopened it.
    - `soft prereqs not yet done (advisory): …` — don't gate on these; touch one
      only if the learner stumbles somewhere it would explain.
    - `[concept] recent: again, hard, good` — grades over the last three sessions,
-     oldest first. For a card that came back `again`, the `slipped:` line has
-     the detail.
+     oldest first. For a card that came back `again` last session, the
+     `slipped:` line has the detail.
    - `slipped: [concept] ITEM_ID, N session(s) running — "note". …` — that card
-     came back `again` last session, N sessions in a row. Open there. If the
-     concept is done and the line says two or more sessions running, **propose
-     re-teaching** it and let the learner decide (see Session types). If the
-     line ends `Still in progress: repair it this session.`, the concept isn't
-     done: repair the card in this session. There is nothing to reopen and no
-     command to run.
+     came back `again` last session. N counts the sessions in a row, among
+     those that reviewed the card, where it came back `again`; a session that
+     didn't review it doesn't break the run. Open there. If the concept is done
+     and the line says two or more sessions running, **propose re-teaching** it
+     and let the learner decide (see Session types). If the line ends `Still in
+     progress: repair it this session.`, the concept isn't done: repair the
+     card in this session. There is nothing to reopen and no command to run.
    - `hard: [concept] ITEM_ID, passed with help — "note". …` — touch on what the
      help was for, in conversation. Don't drill it: the schedule is unchanged.
    - `emphasis: [concept] more|less — …` — the learner asked for this. Don't
@@ -290,10 +291,10 @@ it can't be completed in the session that reopened it.
    the concept has as many passes as the goal's `completion_passes` (default
    one). A pass is a session **later** than the one where teaching started or
    the concept was reopened, in which one of its cards came back `good`/`easy`.
-   The refusal says how many passes it has. So **completing is a later-session event**.
-   Don't plan to teach and complete in one sitting: teach, mint, let the card
-   prove it next time. (No cards means the check is skipped and the response
-   says so — that's a gap, not a pass.)
+   The refusal says how many passes it has. So **completing is a later-session
+   event**. Don't plan to teach and complete in one sitting: teach, mint, let
+   the card prove it next time. (No cards means the check is skipped and the
+   response says so — that's a gap, not a pass.)
 6. Tangents are welcome — follow them, and record anything durable.
 7. **Close on a success.** If the last practice item failed, don't stop there —
    pose one they can clear, however small, and let them clear it. Never close
@@ -321,6 +322,13 @@ it can't be completed in the session that reopened it.
 
    **Always say which setting changed and to what**, in the same turn. Never
    change one silently, and never to make a session go smoother.
+
+   `seba tune` works mid-session, but this session's review list and
+   follow-on concepts were fixed at `seba start`. Emphasis `more` and
+   `--concepts-per-session` show from the next session; `seba grade` still
+   takes only this session's review items. Retention, the interval ceiling and
+   emphasis take effect at each card's next review, which includes cards you
+   grade later in this session.
 
    Then
    `seba end GOAL --summary "3–6 sentences" --hint "concrete next-session hint"`.

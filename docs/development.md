@@ -37,7 +37,8 @@ deterministic half only through the CLI, directed by the `seba-tutor` skill.
   or default silently. Grades are `again | hard | good | easy | skipped`;
   concept status moves `unseen → in-progress → done` one step forward only,
   except `reopened` (`done → in-progress`);
-  `mint_item` is capped at 10 per session.
+  `mint_item` is capped per session by `mint_budget`: 2 to 5, depending on
+  the subject's review capacity.
 - **Fail loudly.** A malformed state file raises an error naming the file; a
   CLI validation failure prints the reason to stderr and exits non-zero.
   Never swallow an error or silently default.
@@ -69,7 +70,7 @@ is the exception).
 | `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record a review grade; `--note` is required on `hard` and `again` |
 | `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create a spaced-repetition card |
 | `seba concept GOAL ID [--status started\|completed\|reopened] [--note TEXT]` | record concept progress or a note; `reopened` is only for a done concept, once the learner has agreed |
-| `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more]` | no flags: print the goal's settings and emphasis; with flags: change them. Works during a session |
+| `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more]` | no flags: print the goal's settings and emphasis; with flags: change them. Works during a session, but the session's review list and follow-on concepts were fixed at `seba start`: emphasis `more` and `--concepts-per-session` show from the next session. Retention, the interval ceiling and emphasis take effect at each card's next review, including cards graded later in this session |
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session |
 | `seba abandon GOAL [--discard]` | quit early: save as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a drafted syllabus YAML |
