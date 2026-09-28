@@ -144,8 +144,7 @@ class Store:
         last_hint, recent_grades = None, []
         by_concept: dict[str, list[Grade]] = {}
         all_by_concept: dict[str, list[Grade]] = {}
-        started_at: dict[str, int] = {}  # session a concept first went in-progress
-        counted_from: dict[str, int] = {}  # started_at, moved on by `reopened`
+        started_at: dict[str, int] = {}  # session a concept last went in-progress
         passed_at: dict[str, list[int]] = {}  # sessions with a good/easy card review
         last_errors: set[str] = set()
         again_runs: dict[str, int] = {}
@@ -181,9 +180,8 @@ class Store:
             for c in rec.concepts:
                 if c.status_change == "started":
                     started_at.setdefault(c.id, n)
-                    counted_from.setdefault(c.id, n)
                 elif c.status_change == "reopened":
-                    counted_from[c.id] = n
+                    started_at[c.id] = n
             if recent:
                 last_hint = rec.next_session_hint or last_hint
         return GoalState(
@@ -210,7 +208,7 @@ class Store:
             last_session_date=last_date,
             passes={
                 cid: len({s for s in passed_at.get(cid, []) if s > start})
-                for cid, start in counted_from.items()
+                for cid, start in started_at.items()
             },
         )
 

@@ -218,13 +218,12 @@ class GoalState(BaseModel):
     again_runs: dict[str, int] = Field(default_factory=dict)
     # The last session's `again` and `hard` reviews, with their notes.
     last_trouble: list[GradeReview] = Field(default_factory=list)
-    started_at: dict[str, int] = Field(
-        default_factory=dict
-    )  # session first in-progress
+    # Session a concept last went in progress: its first `started`, moved on
+    # by each `reopened`.
+    started_at: dict[str, int] = Field(default_factory=dict)
     last_session_date: date | None = None
     # Per concept, the distinct sessions with a good/easy card review, strictly
-    # after the one where teaching started (or where it was last reopened) —
-    # the delayed, unaided check `completed` is gated on.
+    # after started_at — the delayed, unaided check `completed` is gated on.
     passes: dict[str, int] = Field(default_factory=dict)
 
 

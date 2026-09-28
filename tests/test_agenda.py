@@ -8,10 +8,13 @@ from seba.models import (
     GoalState,
     GradeReview,
     Item,
+    SessionRecord,
     SubjectProfile,
     Syllabus,
+    UpdateConcept,
 )
 from seba.scheduler.agenda import build_agenda, resolve_excerpt
+from seba.store.store import Store
 
 TODAY = date(2026, 7, 3)
 
@@ -226,6 +229,35 @@ def test_stuck_check_threshold(tmp_path):
     # and above the rate threshold, silent too
     s3 = state(concepts, grades_by_concept={"b": ["good", "good", "good", "again"]})
     assert "stuck:" not in build_agenda(s3, profile(), TODAY, tmp_path).briefing
+
+
+def test_stuck_counts_from_a_reopen(tmp_path):
+    store = Store(tmp_path / "data")
+    b = Concept(id="b", name="B", status="in-progress")
+    store.create_goal(
+        "prob",
+        Syllabus(goal="prob", subject="probability", concepts=[b]),
+        "probability",
+    )
+    gs = store.load_goal("prob").model_copy(
+        update={"items": [item("it-b", concept="b")]}
+    )
+    for change in ("started", None, None, "reopened", None):
+        store.save_session(
+            "prob",
+            SessionRecord(
+                reviews=[GradeReview(id="it-b", grade="again", note="n")],
+                concepts=[UpdateConcept(id="b", status_change=change)]
+                if change
+                else [],
+                complete=True,
+            ),
+            "t",
+            gs,
+        )
+    s = store.load_goal("prob")
+    briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert "stuck: [b] in progress for 2 session(s)" in briefing
 
 
 def test_session_types(tmp_path):

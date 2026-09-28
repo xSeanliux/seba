@@ -203,6 +203,29 @@ def test_reopening_restarts_the_pass_count(store):
     assert store.load_goal("prob").passes == {"bayes": 1}
 
 
+def test_started_at_is_where_the_concept_last_went_in_progress(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob")
+
+    def record(change):
+        store.save_session(
+            "prob",
+            SessionRecord(
+                concepts=[UpdateConcept(id="bayes", status_change=change)],
+                complete=True,
+            ),
+            "t",
+            gs,
+        )
+
+    record("started")
+    record("started")  # a repeated start does not move it
+    assert store.load_goal("prob").started_at == {"bayes": 1}
+    _save(store, gs)
+    record("reopened")
+    assert store.load_goal("prob").started_at == {"bayes": 4}
+
+
 def test_a_concept_never_started_has_no_passes(store):
     store.create_goal("prob", syl(), "probability")
     gs = store.load_goal("prob").model_copy(update={"items": [item()]})
