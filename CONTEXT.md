@@ -40,11 +40,6 @@ Working out which concepts a new source teaches and how they connect to the
 concepts already there. The tutor drafts, the learner revises and approves.
 _Avoid_: Import, ingest
 
-**Read**:
-A source is read once every concept mapped from it, other than dropped ones, is
-done. Nobody marks a source as read.
-_Avoid_: Finished, completed (completion belongs to concepts)
-
 **Emphasis**:
 The learner's say on how often one concept's cards come back: less, normal, or
 more. It sits on top of the goal's default.

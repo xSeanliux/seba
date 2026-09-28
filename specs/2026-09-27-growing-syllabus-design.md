@@ -1,7 +1,6 @@
 # Changing a syllabus after it starts — design
 
-Status: **draft, scope awaiting confirmation.** Rewritten after four rounds of
-design review. No code written yet. Terms are defined in `CONTEXT.md`.
+Status: **design confirmed.** Settled over five rounds of design review. No code written yet. Terms are defined in `CONTEXT.md`.
 
 ## Where this started, and where it landed
 

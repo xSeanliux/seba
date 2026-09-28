@@ -1,7 +1,6 @@
 # Scheduling controls — design
 
-Status: **draft, awaiting confirmation.** Rewritten after four rounds of design
-review. No code written yet. Terms are defined in `CONTEXT.md`.
+Status: **design confirmed.** Settled over five rounds of design review. No code written yet. Terms are defined in `CONTEXT.md`.
 
 ## What the learner asked for
 
@@ -87,8 +86,7 @@ emphasis:
 - `concepts_per_session` is a ceiling. The agenda lists that many ready concepts
   in order and the tutor starts the next only once the current one reaches a
   stopping point.
-- `completion_passes` generalises the existing delayed-pass gate. The learner's
-  original request named it; it was not examined in review. See "To confirm".
+- `completion_passes` generalises the existing delayed-pass gate.
 - Settings take effect at each card's next review. Stored due dates are not
   rewritten, with one exception below.
 
@@ -162,7 +160,8 @@ and to what.
   a goal with no settings block loads with defaults.
 - A pending session saved before this change still loads.
 
-## To confirm
+## Confirmed in review
 
-1. `completion_passes` stays in, default 1.
-2. Emphasis offsets of +0.05 and −0.10.
+- `completion_passes` stays in, default 1.
+- Emphasis offsets of +0.05 and −0.10 were proposed and not objected to.
+- The scheduler principle is recorded in `docs/adr/0001-scheduler-owns-the-schedule.md`.
