@@ -31,7 +31,12 @@ def apply_record(state: GoalState, record: SessionRecord, now: datetime) -> Goal
     for c in record.concepts:
         if c.status_change:
             try:
-                syllabus = apply_status(syllabus, c.id, _STATUS[c.status_change])
+                syllabus = apply_status(
+                    syllabus,
+                    c.id,
+                    _STATUS[c.status_change],
+                    reopen=c.status_change == "reopened",
+                )
             except SyllabusError:
                 pass  # re-reported or illegal move: never corrupt state
 

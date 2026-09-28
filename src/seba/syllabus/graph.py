@@ -66,16 +66,22 @@ def confusables(s: Syllabus, concept_id: str) -> list[str]:
 _ORDER: list[Status] = [Status.UNSEEN, Status.IN_PROGRESS, Status.DONE]
 
 
-def apply_status(s: Syllabus, concept_id: str, status: Status) -> Syllabus:
+def apply_status(
+    s: Syllabus, concept_id: str, status: Status, *, reopen: bool = False
+) -> Syllabus:
     concepts = []
     found = False
     for c in s.concepts:
         if c.id == concept_id:
             found = True
             # Forward one step, or a reopen. Nothing reopens by itself: the
-            # tutor proposes it and the learner agrees (docs/adr/0001).
-            reopen = (c.status, status) == (Status.DONE, Status.IN_PROGRESS)
-            if not reopen and _ORDER.index(status) != _ORDER.index(c.status) + 1:
+            # tutor proposes it and the learner agrees (docs/adr/0001), so
+            # done -> in-progress needs `reopen`, and `reopen` allows only that.
+            if reopen:
+                legal = (c.status, status) == (Status.DONE, Status.IN_PROGRESS)
+            else:
+                legal = _ORDER.index(status) == _ORDER.index(c.status) + 1
+            if not legal:
                 raise SyllabusError(
                     f"illegal status move for '{concept_id}': {c.status} -> {status}"
                 )

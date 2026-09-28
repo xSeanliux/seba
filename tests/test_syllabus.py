@@ -66,9 +66,12 @@ def test_apply_status_legal_and_illegal():
         apply_status(s, "nope", "done")
 
 
-def test_done_reopens_but_other_moves_back_are_illegal():
+def test_done_reopens_only_when_asked_and_other_moves_back_are_illegal():
     s = make([Concept(id="a", name="A", status="done")])
-    assert apply_status(s, "a", "in-progress").concepts[0].status == "in-progress"
+    with pytest.raises(SyllabusError):
+        apply_status(s, "a", "in-progress")  # nothing reopens by itself
+    reopened = apply_status(s, "a", "in-progress", reopen=True)
+    assert reopened.concepts[0].status == "in-progress"
     with pytest.raises(SyllabusError):
         apply_status(s, "a", "unseen")
     with pytest.raises(SyllabusError):
@@ -76,6 +79,8 @@ def test_done_reopens_but_other_moves_back_are_illegal():
     ip = make([Concept(id="a", name="A", status="in-progress")])
     with pytest.raises(SyllabusError):
         apply_status(ip, "a", "unseen")
+    with pytest.raises(SyllabusError):
+        apply_status(ip, "a", "in-progress", reopen=True)  # only done reopens
 
 
 def test_load_syllabus_yaml(tmp_path: Path):

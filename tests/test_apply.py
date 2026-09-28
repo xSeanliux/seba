@@ -100,6 +100,28 @@ def test_reopened_moves_done_to_in_progress():
     assert out.syllabus.concepts[0].status == "in-progress"
 
 
+def test_started_leaves_a_done_concept_done():
+    # a pending session written before `reopened` existed can still say `started`
+    rec = SessionRecord(concepts=[UpdateConcept(id="bayes", status_change="started")])
+    out = apply_record(done_state(), rec, NOW)
+    assert out.syllabus.concepts[0].status == "done"
+
+
+def test_started_after_completed_in_one_session_leaves_it_done():
+    s = state()
+    s.syllabus.concepts[0] = s.syllabus.concepts[0].model_copy(
+        update={"status": "in-progress"}
+    )
+    rec = SessionRecord(
+        concepts=[
+            UpdateConcept(id="bayes", status_change="completed", evidence="e"),
+            UpdateConcept(id="bayes", status_change="started"),
+        ]
+    )
+    out = apply_record(s, rec, NOW)
+    assert out.syllabus.concepts[0].status == "done"
+
+
 def test_apply_record_uses_the_goals_settings_and_emphasis(monkeypatch):
     monkeypatch.setattr("fsrs.scheduler.random", lambda: 0.5)
     rec = SessionRecord(reviews=[GradeReview(id="it-1", grade="easy")])
