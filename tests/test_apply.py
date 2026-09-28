@@ -1,9 +1,11 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fsrs import Card
 
 from seba.models import (
     Concept,
+    Emphasis,
+    GoalSettings,
     GoalState,
     GradeReview,
     Item,
@@ -115,3 +117,28 @@ def test_completed_this_session_beats_the_lapse():
     )
     out = apply_record(s, rec, NOW)
     assert out.syllabus.concepts[0].status == "done"
+
+
+def test_apply_record_uses_the_goals_settings_and_emphasis(monkeypatch):
+    monkeypatch.setattr("fsrs.scheduler.random", lambda: 0.5)
+    rec = SessionRecord(reviews=[GradeReview(id="it-1", grade="easy")])
+
+    def due_after(**update):
+        s = state().model_copy(update=update)
+        out = apply_record(s, rec, NOW)
+        return datetime.fromisoformat(out.items[0].fsrs["due"])
+
+    normal = due_after()
+    assert due_after(emphasis={"bayes": Emphasis.MORE}) < normal
+    assert due_after(emphasis={"other": Emphasis.MORE}) == normal
+    capped = due_after(settings=GoalSettings(max_interval_days=2))
+    assert capped - NOW <= timedelta(days=2)
+
+
+def test_an_unreviewed_card_keeps_its_due_date():
+    # Settings take effect at a card's next review; stored dates are not rewritten.
+    far = "2028-01-01T00:00:00+00:00"
+    s = state()
+    s.items[0] = s.items[0].model_copy(update={"fsrs": _fsrs(far)})
+    out = apply_record(s, SessionRecord(), NOW)
+    assert out.items[0].fsrs["due"] == far

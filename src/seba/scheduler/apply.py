@@ -26,7 +26,12 @@ def lapsing_concepts(state: GoalState, record: SessionRecord) -> set[str]:
 def apply_record(state: GoalState, record: SessionRecord, now: datetime) -> GoalState:
     grades = {r.id: r.grade for r in record.reviews}
     items = [
-        apply_review(i, grades[i.id], now) if i.id in grades else i for i in state.items
+        apply_review(
+            i, grades[i.id], now, state.settings, state.emphasis.get(i.concept)
+        )
+        if i.id in grades
+        else i
+        for i in state.items
     ]
     # Mint due-dates use the LOCAL day so a freshly minted card is due the same
     # day the scheduler filters on (start/build_agenda use date.today(), local).

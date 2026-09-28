@@ -5,7 +5,15 @@ from uuid import uuid4
 from fsrs import Card, Rating, Scheduler
 from fsrs.card import CardDict
 
-from seba.models import Grade, Item, MintItem
+from seba.models import (
+    RETENTION_MAX,
+    RETENTION_MIN,
+    Emphasis,
+    GoalSettings,
+    Grade,
+    Item,
+    MintItem,
+)
 
 _RATING = {
     "again": Rating.Again,
@@ -13,7 +21,12 @@ _RATING = {
     "good": Rating.Good,
     "easy": Rating.Easy,
 }
-_scheduler = Scheduler()
+_SHIFT = {Emphasis.MORE: 0.05, Emphasis.LESS: -0.10}
+
+
+def target_retention(settings: GoalSettings, emphasis: Emphasis | None) -> float:
+    shift = _SHIFT[emphasis] if emphasis is not None else 0.0
+    return min(RETENTION_MAX, max(RETENTION_MIN, settings.desired_retention + shift))
 
 
 def due_items(items: list[Item], today: date, limit: int) -> list[Item]:
@@ -27,10 +40,25 @@ def due_items(items: list[Item], today: date, limit: int) -> list[Item]:
     return due[:limit]
 
 
-def apply_review(item: Item, grade: Grade, now: datetime) -> Item:
+def apply_review(
+    item: Item,
+    grade: Grade,
+    now: datetime,
+    settings: GoalSettings,
+    emphasis: Emphasis | None,
+) -> Item:
     if grade == "skipped":
         return item
-    card, _ = _scheduler.review_card(
+    # No learning or relearning steps: those are minutes, for re-showing a card
+    # in the same sitting, and sessions are days apart. Every grade then yields
+    # at least a day and `hard` grows the interval.
+    scheduler = Scheduler(
+        desired_retention=target_retention(settings, emphasis),
+        learning_steps=(),
+        relearning_steps=(),
+        maximum_interval=settings.max_interval_days,
+    )
+    card, _ = scheduler.review_card(
         Card.from_dict(cast(CardDict, item.fsrs)), _RATING[grade], review_datetime=now
     )
     return item.model_copy(update={"fsrs": dict(card.to_dict())})
