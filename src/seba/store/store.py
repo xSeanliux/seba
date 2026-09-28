@@ -13,6 +13,7 @@ from seba.models import (
     GoalState,
     GoalSummary,
     Grade,
+    GradeReview,
     Item,
     SessionRecord,
     Syllabus,
@@ -147,6 +148,8 @@ class Store:
         started_at: dict[str, int] = {}  # session a concept first went in-progress
         passed_at: dict[str, list[int]] = {}  # sessions with a good/easy card review
         last_errors: set[str] = set()
+        again_runs: dict[str, int] = {}
+        last_trouble: list[GradeReview] = []
         last_date: date | None = None
         # ponytail: re-reads every outcomes file per load; sessions are small and
         # few. Cache or a derived index only if a goal's history gets long.
@@ -156,14 +159,21 @@ class Store:
             last = n == len(outcomes)
             if last:
                 last_date, last_errors = rec.session_date, set()
+                last_trouble = []
             for r in rec.reviews:
+                if r.grade == Grade.AGAIN:
+                    again_runs[r.id] = again_runs.get(r.id, 0) + 1
+                elif r.grade != Grade.SKIPPED:
+                    again_runs.pop(r.id, None)
+                if last and r.grade in (Grade.AGAIN, Grade.HARD):
+                    last_trouble.append(r)
                 by_item.setdefault(r.id, []).append(r.grade)
                 cid = concept_of.get(r.id)  # item may since have been deleted
                 if cid is not None:
                     all_by_concept.setdefault(cid, []).append(r.grade)
                     if r.grade in (Grade.GOOD, Grade.EASY):
                         passed_at.setdefault(cid, []).append(n)
-                    elif last and r.grade in (Grade.AGAIN, Grade.HARD):
+                    elif last and r.grade == Grade.AGAIN:
                         last_errors.add(cid)
                 if recent:
                     recent_grades.append(r.grade)
@@ -193,6 +203,8 @@ class Store:
             recent_by_item={i: g[-2:] for i, g in by_item.items()},
             grades_by_concept=all_by_concept,
             last_session_errors=last_errors,
+            again_runs=again_runs,
+            last_trouble=last_trouble,
             started_at=started_at,
             last_session_date=last_date,
             delayed_pass={

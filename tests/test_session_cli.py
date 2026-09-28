@@ -223,3 +223,38 @@ def test_abandon_saves_incomplete(monkeypatch, tmp_path):
     assert not (data / "goals" / "prob" / "session.pending.yaml").exists()
     body = (data / "goals" / "prob" / "sessions" / "002.md").read_text()
     assert "INCOMPLETE" in body
+
+
+AWKWARD = 'mixed up "σ-algebra"\nwith a topology — perché?'
+
+
+def _finish_session(*grade_args):
+    assert runner.invoke(app, ["start", "prob"]).exit_code == 0
+    result = runner.invoke(app, ["grade", "prob", "it-1", *grade_args])
+    assert result.exit_code == 0, result.output
+    result = runner.invoke(app, ["end", "prob", "--summary", "s", "--hint", "h"])
+    assert result.exit_code == 0, result.output
+
+
+def _briefing():
+    result = runner.invoke(app, ["start", "prob"])
+    assert result.exit_code == 0, result.output
+    return yaml.safe_load(result.output)["agenda"]
+
+
+def test_grade_hard_without_a_note_is_refused(monkeypatch, tmp_path):
+    seed(env(monkeypatch, tmp_path))
+    runner.invoke(app, ["start", "prob"])
+    result = runner.invoke(app, ["grade", "prob", "it-1", "hard"])
+    assert result.exit_code == 1 and "--note" in result.output
+    result = runner.invoke(app, ["grade", "prob", "it-1", "hard", "--note", "  "])
+    assert result.exit_code == 1
+
+
+def test_a_hard_note_reaches_the_next_briefing(monkeypatch, tmp_path):
+    seed(env(monkeypatch, tmp_path))
+    _finish_session("hard", "--note", AWKWARD)
+    agenda = _briefing()
+    assert f'hard: [bayes] it-1, passed with help — "{AWKWARD}".' in agenda["briefing"]
+    # a `hard`-only session pulls no extra cards into the next
+    assert agenda["review_items"] == []

@@ -84,8 +84,32 @@ def test_end_session_gate(handler):
 
 def test_missing_grades(handler):
     assert handler.missing_grades() == ["it-1", "it-2"]
-    handler.handle("grade_review", {"id": "it-1", "grade": "again"})
+    handler.handle("grade_review", {"id": "it-1", "grade": "again", "note": "blanked"})
     assert handler.missing_grades() == ["it-2"]
+
+
+@pytest.mark.parametrize("grade", ["hard", "again"])
+@pytest.mark.parametrize("note", [None, "", "   ", "\n\t"])
+def test_hard_and_again_need_a_note(handler, grade, note):
+    text, err = handler.handle(
+        "grade_review", {"id": "it-1", "grade": grade, "note": note}
+    )
+    assert err and "--note" in text
+    assert not handler.record.reviews
+
+
+@pytest.mark.parametrize("grade", ["hard", "again"])
+def test_hard_and_again_record_with_a_note(handler, grade):
+    _, err = handler.handle(
+        "grade_review", {"id": "it-1", "grade": grade, "note": "needed the formula"}
+    )
+    assert not err and handler.record.reviews[0].note == "needed the formula"
+
+
+@pytest.mark.parametrize("grade", ["good", "easy", "skipped"])
+def test_other_grades_need_no_note(handler, grade):
+    _, err = handler.handle("grade_review", {"id": "it-1", "grade": grade})
+    assert not err
 
 
 def test_completed_needs_delayed_evidence(handler):

@@ -285,3 +285,52 @@ def test_emphasis_on_an_unknown_concept_is_ignored_at_load(store):
     path = _goal_yaml(store)
     path.write_text(path.read_text() + "emphasis:\n  ghost: more\n  bayes: less\n")
     assert store.load_goal("prob").emphasis == {"bayes": "less"}
+
+
+def _save(store, gs, *reviews):
+    store.save_session(
+        "prob", SessionRecord(reviews=list(reviews), complete=True), "t", gs
+    )
+
+
+def test_hard_is_not_an_error_site(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    _save(store, gs, GradeReview(id="it-1", grade="hard", note="needed the formula"))
+    gs2 = store.load_goal("prob")
+    assert gs2.last_session_errors == set()
+    assert gs2.last_trouble == [
+        GradeReview(id="it-1", grade="hard", note="needed the formula")
+    ]
+    assert gs2.again_runs == {}
+
+
+def test_again_runs_count_the_trailing_run(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    _save(store, gs, GradeReview(id="it-1", grade="again", note="blanked"))
+    assert store.load_goal("prob").again_runs == {"it-1": 1}
+    _save(store, gs, GradeReview(id="it-1", grade="skipped"))  # ignored
+    _save(store, gs, GradeReview(id="it-1", grade="again", note="blanked again"))
+    gs3 = store.load_goal("prob")
+    assert gs3.again_runs == {"it-1": 2}
+    assert [r.note for r in gs3.last_trouble] == ["blanked again"]
+    assert gs3.last_session_errors == {"bayes"}
+    _save(store, gs, GradeReview(id="it-1", grade="hard", note="one hint"))
+    assert store.load_goal("prob").again_runs == {}  # a pass resets it
+
+
+def test_last_trouble_is_the_last_session_only(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    _save(store, gs, GradeReview(id="it-1", grade="again", note="blanked"))
+    _save(store, gs, GradeReview(id="it-1", grade="good"))
+    assert store.load_goal("prob").last_trouble == []
+
+
+def test_old_outcomes_without_notes_still_load(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    _save(store, gs, GradeReview(id="it-1", grade="again"))  # as written before
+    gs2 = store.load_goal("prob")
+    assert gs2.last_trouble[0].note is None and gs2.again_runs == {"it-1": 1}

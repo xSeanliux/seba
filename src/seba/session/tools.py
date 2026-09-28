@@ -5,6 +5,7 @@ from pydantic import BaseModel, ValidationError
 from seba.models import (
     Agenda,
     EndSession,
+    Grade,
     GradeReview,
     MintItem,
     SessionRecord,
@@ -68,6 +69,15 @@ class ToolHandler:
             return f"'{call.id}' is not in this session's review items", True
         if call.id in {r.id for r in self.record.reviews}:
             return f"'{call.id}' already graded", True
+        if call.grade in (Grade.AGAIN, Grade.HARD) and not (call.note or "").strip():
+            # Enforced here, not on GradeReview: the model also parses old
+            # session outcomes, which have no notes.
+            what = (
+                "what went wrong"
+                if call.grade == Grade.AGAIN
+                else "what the help was for"
+            )
+            return f"grading '{call.grade}' requires --note saying {what}", True
         self.record.reviews.append(call)
         return "recorded", False
 

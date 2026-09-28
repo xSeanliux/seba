@@ -1,6 +1,14 @@
 from datetime import date
 
-from seba.models import Concept, GoalState, Item, SubjectProfile, Syllabus
+from seba.models import (
+    Concept,
+    Emphasis,
+    GoalState,
+    GradeReview,
+    Item,
+    SubjectProfile,
+    Syllabus,
+)
 from seba.scheduler.agenda import build_agenda, resolve_excerpt
 
 TODAY = date(2026, 7, 3)
@@ -253,3 +261,56 @@ def test_deterministic(tmp_path):
     a1 = build_agenda(s, profile(), TODAY, tmp_path)
     a2 = build_agenda(s, profile(), TODAY, tmp_path)
     assert a1 == a2
+
+
+def trouble_state(**kw):
+    return state(
+        [Concept(id="a", name="A", status="done"), Concept(id="b", name="B")],
+        [item("it-a", concept="a", due="2099-01-01T00:00:00+00:00")],
+        **kw,
+    )
+
+
+def test_slipped_line_carries_the_run_and_the_note(tmp_path):
+    s = trouble_state(
+        last_trouble=[GradeReview(id="it-a", grade="again", note="mixed up e and x⁻¹")],
+        again_runs={"it-a": 2},
+    )
+    briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert (
+        'slipped: [a] it-a, 2 sessions running — "mixed up e and x⁻¹". '
+        "Propose re-teaching if the repair doesn't hold." in briefing
+    )
+
+
+def test_slipped_line_for_a_first_slip_without_a_note(tmp_path):
+    s = trouble_state(
+        last_trouble=[GradeReview(id="it-a", grade="again")], again_runs={"it-a": 1}
+    )
+    briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert "slipped: [a] it-a, 1 session running. Propose" in briefing
+
+
+def test_hard_line_carries_the_note(tmp_path):
+    s = trouble_state(
+        last_trouble=[GradeReview(id="it-a", grade="hard", note="needed the formula")]
+    )
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert 'hard: [a] it-a, passed with help — "needed the formula".' in a.briefing
+    assert "slipped:" not in a.briefing
+    assert a.review_items == []  # a `hard` pulls nothing in
+
+
+def test_trouble_on_a_deleted_card_is_skipped(tmp_path):
+    s = trouble_state(last_trouble=[GradeReview(id="it-gone", grade="again", note="n")])
+    assert "slipped:" not in build_agenda(s, profile(), TODAY, tmp_path).briefing
+
+
+def test_emphasis_lines(tmp_path):
+    s = trouble_state(emphasis={"b": Emphasis.MORE, "a": Emphasis.LESS})
+    briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert "emphasis: [a] less" in briefing and "emphasis: [b] more" in briefing
+    assert (
+        "emphasis:"
+        not in build_agenda(trouble_state(), profile(), TODAY, tmp_path).briefing
+    )

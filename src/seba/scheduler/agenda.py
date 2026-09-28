@@ -5,6 +5,7 @@ from pathlib import Path
 from seba.models import (
     Agenda,
     Concept,
+    Emphasis,
     GoalState,
     Grade,
     Item,
@@ -75,9 +76,10 @@ def _session_type(state: GoalState, today: date, done: int) -> SessionType:
 def _reviews(
     state: GoalState, teach_src: Concept | None, today: date, cap: int
 ) -> list[Item]:
-    """Due ∪ prereqs-of-today ∪ last session's error sites (Rosenshine's daily
-    review: due-ness is orthogonal to what today's lesson needs). Due items win
-    the cap; the rest fill what's left."""
+    """Due ∪ prereqs-of-today ∪ last session's error sites, the concepts with a
+    card graded `again` (Rosenshine's daily review: due-ness is orthogonal to
+    what today's lesson needs). Due items win the cap; the rest fill what's
+    left."""
     picked = due_items(state.items, today, cap)
     seen = {i.id for i in picked}
     warm = set(state.last_session_errors)
@@ -116,6 +118,40 @@ def _stuck_lines(state: GoalState) -> list[str]:
             "concept, drop to a prerequisite, or switch representation."
         )
     return lines
+
+
+def _trouble_lines(state: GoalState) -> list[str]:
+    """What went wrong last session, in the tutor's own words. Reporting only:
+    the scheduler has already decided when each of these cards comes back."""
+    concept_of = {i.id: i.concept for i in state.items}
+    lines = []
+    for r in state.last_trouble:
+        cid = concept_of.get(r.id)
+        if cid is None:
+            continue  # card since deleted
+        note = (r.note or "").strip()
+        said = f' — "{note}"' if note else ""
+        if r.grade == Grade.AGAIN:
+            n = state.again_runs.get(r.id, 1)
+            lines.append(
+                f"slipped: [{cid}] {r.id}, {n} session{'' if n == 1 else 's'} "
+                f"running{said}. Propose re-teaching if the repair doesn't hold."
+            )
+        else:
+            lines.append(
+                f"hard: [{cid}] {r.id}, passed with help{said}. Touch on it in "
+                "conversation; the schedule is unchanged."
+            )
+    return lines
+
+
+def _emphasis_lines(state: GoalState) -> list[str]:
+    often = {Emphasis.MORE: "more", Emphasis.LESS: "less"}
+    return [
+        f"emphasis: [{cid}] {e} — the learner asked to see these cards "
+        f"{often[e]} often."
+        for cid, e in sorted(state.emphasis.items())
+    ]
 
 
 def build_agenda(
@@ -194,6 +230,8 @@ def build_agenda(
             "these don't gate the concept; touch them only if the learner stumbles."
         )
     lines += _stuck_lines(state)
+    lines += _trouble_lines(state)
+    lines += _emphasis_lines(state)
     if state.last_hint:
         lines.append(f"Last session's hint: {state.last_hint}")
     notes = parse_notes(state.notes)

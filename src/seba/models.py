@@ -137,9 +137,10 @@ class Agenda(BaseModel):
 class GradeReview(BaseModel):
     """Grade a review item right after its exchange resolves.
 
-    Rubric: wrong or no recall -> again; correct with significant
-    hesitation or hints -> hard; correct -> good; instant and
-    confident -> easy; never reached this session -> skipped."""
+    Rubric: wrong or no recall -> again; correct, but only with
+    significant help -> hard (a pass); correct and unaided -> good;
+    instant and confident -> easy; never reached this session -> skipped.
+    `again` and `hard` need a note: what went wrong, or what the help was for."""
 
     id: str
     grade: Grade
@@ -207,9 +208,14 @@ class GoalState(BaseModel):
     recent_by_concept: dict[str, list[Grade]] = Field(default_factory=dict)
     recent_by_item: dict[str, list[Grade]] = Field(default_factory=dict)
     grades_by_concept: dict[str, list[Grade]] = Field(default_factory=dict)  # all-time
-    # Concepts graded `again`/`hard` in the most recent session only — Rosenshine's
-    # "review where errors were made last time", which the 3-session pool blurs.
+    # Concepts with a card graded `again` in the most recent session only —
+    # Rosenshine's "review where errors were made last time". `hard` is a pass
+    # and pulls nothing in.
     last_session_errors: set[str] = Field(default_factory=set)
+    # Per card, how many of its most recent reviews in a row were `again`.
+    again_runs: dict[str, int] = Field(default_factory=dict)
+    # The last session's `again` and `hard` reviews, with their notes.
+    last_trouble: list[GradeReview] = Field(default_factory=list)
     started_at: dict[str, int] = Field(
         default_factory=dict
     )  # session first in-progress
