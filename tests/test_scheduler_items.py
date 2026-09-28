@@ -4,7 +4,13 @@ import pytest
 from fsrs import Card, Rating, Scheduler, State
 
 from seba.models import Emphasis, GoalSettings, Item, MintItem
-from seba.scheduler.items import apply_review, due_items, mint_item, target_retention
+from seba.scheduler.items import (
+    apply_review,
+    due_items,
+    due_now,
+    mint_item,
+    target_retention,
+)
 
 NOW = datetime(2026, 7, 3, tzinfo=timezone.utc)
 DEFAULTS = GoalSettings()
@@ -181,3 +187,12 @@ def test_a_card_due_past_the_ceiling_is_capped_at_its_next_review():
     item = new_card().model_copy(update={"fsrs": fsrs})
     graded = apply_review(item, "good", due, DEFAULTS, None)
     assert days(graded, due) <= 180
+
+
+def test_due_now_stamps_today_like_a_new_card():
+    today = date(2026, 7, 3)
+    item = make_item(due="2027-01-01T00:00:00+00:00")
+    stamped = due_now(item, today)
+    assert stamped.fsrs["due"] == new_card().fsrs["due"]
+    assert due_items([stamped], today, limit=5) == [stamped]
+    assert item.fsrs["due"] == "2027-01-01T00:00:00+00:00"  # the input is untouched

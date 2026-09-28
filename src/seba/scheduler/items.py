@@ -64,12 +64,21 @@ def apply_review(
     return item.model_copy(update={"fsrs": dict(card.to_dict())})
 
 
+def _start_of(today: date) -> str:
+    return datetime.combine(today, time.min, tzinfo=timezone.utc).isoformat()
+
+
+def due_now(item: Item, today: date) -> Item:
+    """Make a card due today. Used only when the learner sets emphasis `more`."""
+    return item.model_copy(update={"fsrs": {**item.fsrs, "due": _start_of(today)}})
+
+
 def mint_item(new: MintItem, today: date) -> Item:
     # py-fsrs stamps a new Card.due from the wall clock; override it to `today`
     # so scheduling stays deterministic in the passed date (spec §M2) and a
     # freshly minted card is due the day it is created.
     fsrs = dict(Card().to_dict())
-    fsrs["due"] = datetime.combine(today, time.min, tzinfo=timezone.utc).isoformat()
+    fsrs["due"] = _start_of(today)
     return Item(
         id=f"it-{uuid4().hex[:8]}",
         concept=new.concept,

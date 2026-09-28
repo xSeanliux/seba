@@ -1,5 +1,7 @@
-from datetime import date
+import subprocess
+from datetime import date, datetime, timedelta, timezone
 
+import pytest
 import yaml
 from fsrs import Card
 from typer.testing import CliRunner
@@ -346,3 +348,197 @@ def test_a_reopened_concept_cannot_complete_in_the_same_session(monkeypatch, tmp
         app, ["concept", "prob", "bayes", "--status", "completed", "--evidence", "x"]
     )
     assert result.exit_code == 1 and "0 of 1" in result.output
+
+
+def _goal_yaml(data):
+    return yaml.safe_load((data / "goals" / "prob" / "goal.yaml").read_text())
+
+
+def _commit_count(data):
+    out = subprocess.run(
+        ["git", "rev-list", "--count", "HEAD"], cwd=data, capture_output=True, text=True
+    )
+    return int(out.stdout)
+
+
+def test_tune_prints_and_writes_nothing(monkeypatch, tmp_path):
+    data = env(monkeypatch, tmp_path)
+    seed(data)
+    before = _commit_count(data)
+    result = runner.invoke(app, ["tune", "prob"])
+    assert result.exit_code == 0
+    shown = yaml.safe_load(result.output)
+    assert shown["settings"] == {
+        "desired_retention": 0.9,
+        "max_interval_days": 180,
+        "concepts_per_session": 1,
+        "completion_passes": 1,
+    }
+    assert shown["emphasis"] == {}
+    assert _commit_count(data) == before and "settings" not in _goal_yaml(data)
+
+
+def test_tune_roundtrips_through_goal_yaml(monkeypatch, tmp_path):
+    data = env(monkeypatch, tmp_path)
+    store = seed(data)
+    result = runner.invoke(
+        app,
+        ["tune", "prob", "--retention", "0.85", "--max-interval", "120"]
+        + ["--concepts-per-session", "2", "--completion-passes", "2"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "desired_retention: 0.9 → 0.85" in result.output
+    assert "max_interval_days: 180 → 120" in result.output
+    assert _goal_yaml(data)["settings"] == {
+        "desired_retention": 0.85,
+        "max_interval_days": 120,
+        "concepts_per_session": 2,
+        "completion_passes": 2,
+    }
+    s = store.load_goal("prob").settings
+    assert (s.desired_retention, s.max_interval_days) == (0.85, 120)
+    # a later tune changes one value and keeps the rest
+    runner.invoke(app, ["tune", "prob", "--retention", "0.8"])
+    s = store.load_goal("prob").settings
+    assert (s.desired_retention, s.max_interval_days) == (0.8, 120)
+
+
+@pytest.mark.parametrize(
+    "flags,bounds",
+    [
+        (["--retention", "0.5"], ["0.7", "0.97"]),
+        (["--retention", "0.99"], ["0.7", "0.97"]),
+        (["--max-interval", "0"], ["1"]),
+        (["--concepts-per-session", "6"], ["1", "5"]),
+        (["--completion-passes", "0"], ["1"]),
+    ],
+)
+def test_tune_refuses_out_of_range_with_the_range(monkeypatch, tmp_path, flags, bounds):
+    data = env(monkeypatch, tmp_path)
+    seed(data)
+    before = _commit_count(data)
+    result = runner.invoke(app, ["tune", "prob", *flags])
+    assert result.exit_code == 1
+    assert flags[0] in result.output
+    assert all(b in result.output for b in bounds)
+    assert _commit_count(data) == before and "settings" not in _goal_yaml(data)
+
+
+@pytest.mark.parametrize(
+    "flags,said",
+    [
+        (["--concept", "ghost", "--emphasis", "more"], "unknown concept"),
+        (["--concept", "bayes"], "--emphasis"),
+        (["--emphasis", "more"], "--concept"),
+        (["--concept", "bayes", "--emphasis", "lots"], "less, normal, more"),
+    ],
+)
+def test_tune_refuses_bad_emphasis(monkeypatch, tmp_path, flags, said):
+    data = env(monkeypatch, tmp_path)
+    seed(data)
+    result = runner.invoke(app, ["tune", "prob", *flags])
+    assert result.exit_code == 1 and said in result.output
+    assert "emphasis" not in _goal_yaml(data)
+
+
+def test_emphasis_more_makes_the_cards_due_now(monkeypatch, tmp_path):
+    data = env(monkeypatch, tmp_path)
+    store = seed(data)
+    gs = store.load_goal("prob")
+    far = gs.items[0].model_copy(update={"fsrs": _fsrs("2099-01-01T00:00:00+00:00")})
+    store.save_tuning("prob", gs.settings, gs.emphasis, [far])
+    assert (
+        yaml.safe_load(runner.invoke(app, ["start", "prob"]).output)["agenda"][
+            "review_items"
+        ]
+        == []
+    )
+    runner.invoke(app, ["abandon", "prob", "--discard"])
+
+    result = runner.invoke(
+        app, ["tune", "prob", "--concept", "bayes", "--emphasis", "more"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "emphasis [bayes]: normal → more" in result.output
+    assert "1 card due now" in result.output
+    gs2 = store.load_goal("prob")
+    assert gs2.emphasis == {"bayes": "more"}
+    assert gs2.items[0].fsrs["due"][:10] == date.today().isoformat()
+    agenda = yaml.safe_load(runner.invoke(app, ["start", "prob"]).output)["agenda"]
+    assert [r["id"] for r in agenda["review_items"]] == ["it-1"]
+    assert "emphasis: [bayes] more" in agenda["briefing"]
+
+
+def test_emphasis_less_and_normal_leave_due_dates_alone(monkeypatch, tmp_path):
+    data = env(monkeypatch, tmp_path)
+    store = seed(data)
+    due = store.load_goal("prob").items[0].fsrs["due"]
+    runner.invoke(app, ["tune", "prob", "--concept", "bayes", "--emphasis", "less"])
+    gs = store.load_goal("prob")
+    assert gs.emphasis == {"bayes": "less"} and gs.items[0].fsrs["due"] == due
+    result = runner.invoke(
+        app, ["tune", "prob", "--concept", "bayes", "--emphasis", "normal"]
+    )
+    assert "emphasis [bayes]: less → normal" in result.output
+    assert store.load_goal("prob").emphasis == {}
+    assert _goal_yaml(data)["emphasis"] == {}
+
+
+def test_tune_with_nothing_to_change_does_not_commit(monkeypatch, tmp_path):
+    data = env(monkeypatch, tmp_path)
+    seed(data)
+    runner.invoke(app, ["tune", "prob", "--retention", "0.85"])
+    before = _commit_count(data)
+    result = runner.invoke(app, ["tune", "prob", "--retention", "0.85"])
+    assert result.exit_code == 0 and "nothing changed" in result.output
+    assert _commit_count(data) == before
+
+
+def test_tune_works_during_a_session(monkeypatch, tmp_path):
+    data = env(monkeypatch, tmp_path)
+    store = seed(data)
+    runner.invoke(app, ["start", "prob"])
+    pending = data / "goals" / "prob" / "session.pending.yaml"
+    before = pending.read_text()
+    result = runner.invoke(app, ["tune", "prob", "--max-interval", "5"])
+    assert result.exit_code == 0, result.output
+    assert pending.read_text() == before
+    runner.invoke(app, ["grade", "prob", "it-1", "easy"])
+    result = runner.invoke(app, ["end", "prob", "--summary", "s", "--hint", "h"])
+    assert result.exit_code == 0, result.output
+    due = datetime.fromisoformat(store.load_goal("prob").items[0].fsrs["due"])
+    assert due - datetime.now(timezone.utc) <= timedelta(days=5)  # new ceiling applied
+
+
+def test_tune_on_an_unknown_goal_fails_cleanly(monkeypatch, tmp_path):
+    env(monkeypatch, tmp_path)
+    result = runner.invoke(app, ["tune", "nope"])
+    assert result.exit_code == 1 and "no such goal" in result.output
+
+
+@pytest.mark.parametrize(
+    "emphasis_flags",
+    [
+        ["--concept", "ghost", "--emphasis", "more"],
+        ["--concept", "bayes", "--emphasis", "lots"],
+        ["--concept", "bayes"],
+    ],
+)
+def test_a_valid_setting_with_a_bad_emphasis_writes_nothing(
+    monkeypatch, tmp_path, emphasis_flags
+):
+    data = env(monkeypatch, tmp_path)
+    seed(data)
+    gdir = data / "goals" / "prob"
+    goal_yaml, items = (
+        (gdir / "goal.yaml").read_text(),
+        (gdir / "items.jsonl").read_text(),
+    )
+    before = _commit_count(data)
+    result = runner.invoke(
+        app, ["tune", "prob", "--retention", "0.85", *emphasis_flags]
+    )
+    assert result.exit_code == 1
+    assert (gdir / "goal.yaml").read_text() == goal_yaml
+    assert (gdir / "items.jsonl").read_text() == items
+    assert _commit_count(data) == before

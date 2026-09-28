@@ -3,11 +3,19 @@ from pathlib import Path
 
 import typer
 import yaml
+from pydantic import ValidationError
 
 from seba import config
-from seba.models import GoalState, PendingSession, SubjectProfile
+from seba.models import (
+    Emphasis,
+    GoalSettings,
+    GoalState,
+    PendingSession,
+    SubjectProfile,
+)
 from seba.scheduler.agenda import build_agenda
 from seba.scheduler.apply import apply_record
+from seba.scheduler.items import due_now
 from seba.session.loader import load_overlay, load_profile
 from seba.session.pending import (
     PendingError,
@@ -270,3 +278,102 @@ def view(
     typer.echo(str(out))
     if open_browser:
         typer.launch(str(out))
+
+
+_FLAG = {
+    "desired_retention": "--retention",
+    "max_interval_days": "--max-interval",
+    "concepts_per_session": "--concepts-per-session",
+    "completion_passes": "--completion-passes",
+}
+_LEVELS = ("less", "normal", "more")
+
+
+def _range(field: str) -> str:
+    """The valid range of a setting, read off the model so it is stated once."""
+    spec = GoalSettings.model_json_schema()["properties"][field]
+    low, high = spec.get("minimum"), spec.get("maximum")
+    return f"between {low} and {high}" if high is not None else f"at least {low}"
+
+
+def _refuse(message: str) -> typer.Exit:
+    typer.echo(message, err=True)
+    return typer.Exit(1)
+
+
+@app.command()
+def tune(
+    goal: str,
+    retention: float | None = typer.Option(None, "--retention"),
+    max_interval: int | None = typer.Option(None, "--max-interval"),
+    concepts_per_session: int | None = typer.Option(None, "--concepts-per-session"),
+    completion_passes: int | None = typer.Option(None, "--completion-passes"),
+    concept: str | None = typer.Option(None, "--concept"),
+    emphasis: str | None = typer.Option(None, "--emphasis", help="less|normal|more"),
+):
+    store = _store()
+    state = _load_goal(store, goal)
+    asked = {
+        "desired_retention": retention,
+        "max_interval_days": max_interval,
+        "concepts_per_session": concepts_per_session,
+        "completion_passes": completion_passes,
+    }
+    changes = {k: v for k, v in asked.items() if v is not None}
+    if not changes and concept is None and emphasis is None:
+        typer.echo(
+            yaml.safe_dump(
+                {
+                    "settings": state.settings.model_dump(mode="json"),
+                    "emphasis": {c: str(e) for c, e in state.emphasis.items()},
+                },
+                sort_keys=False,
+            )
+        )
+        return
+
+    try:
+        settings = GoalSettings.model_validate(
+            {**state.settings.model_dump(), **changes}
+        )
+    except ValidationError as e:
+        fields = [str(err["loc"][0]) for err in e.errors()]
+        raise _refuse("\n".join(f"{_FLAG[f]} must be {_range(f)}" for f in fields))
+
+    said = [
+        f"{k}: {getattr(state.settings, k)} → {v}"
+        for k, v in changes.items()
+        if getattr(state.settings, k) != v
+    ]
+    levels = dict(state.emphasis)
+    items = state.items
+    if (concept is None) != (emphasis is None):
+        raise _refuse("--concept and --emphasis go together")
+    if concept is not None and emphasis is not None:
+        if concept not in {c.id for c in state.syllabus.concepts}:
+            raise _refuse(f"unknown concept: '{concept}'")
+        if emphasis not in _LEVELS:
+            raise _refuse(f"--emphasis must be one of: {', '.join(_LEVELS)}")
+        was = str(levels.get(concept, "normal"))
+        if emphasis == "normal":
+            levels.pop(concept, None)
+        else:
+            levels[concept] = Emphasis(emphasis)
+        line = f"emphasis [{concept}]: {was} → {emphasis}"
+        if emphasis == "more":
+            # The one direct override of the schedule, and only because the
+            # learner asked: "I keep losing functors" on Monday, functors Tuesday.
+            mine = [i for i in items if i.concept == concept]
+            items = [
+                due_now(i, date.today()) if i.concept == concept else i for i in items
+            ]
+            line += f" ({len(mine)} card{'' if len(mine) == 1 else 's'} due now)"
+        if was != emphasis or emphasis == "more":
+            said.append(line)
+
+    # Nothing to say means nothing to write; and save_tuning itself declines to
+    # commit when the files come out identical (emphasis `more` set twice).
+    if not said or not store.save_tuning(goal, settings, levels, items):
+        typer.echo("nothing changed")
+        return
+    typer.echo("\n".join(said))
