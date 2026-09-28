@@ -29,3 +29,18 @@ _Avoid_: Treating a paper as a concept
 One question with one answer, belonging to exactly one concept, reviewed on a
 spaced schedule. A concept usually has several.
 _Avoid_: Item, flashcard
+
+**Hard**:
+The grade for a correct answer that needed significant help. It is a pass, and
+it always records what the help was for.
+_Avoid_: Using it to mean a failure, or a slow but unaided answer
+
+**Mapping**:
+Working out which concepts a new source teaches and how they connect to the
+concepts already there. The tutor drafts, the learner revises and approves.
+_Avoid_: Import, ingest
+
+**Dropped**:
+A concept the learner has set aside because the direction moved. It is no longer
+taught or reviewed, its history is kept, and it can be restored.
+_Avoid_: Deleted, archived
