@@ -1,3 +1,9 @@
+from pathlib import Path
+
+import pytest
+import yaml
+
+from seba.models import SubjectProfile
 from seba.session.loader import load_overlay, load_profile
 
 
@@ -24,3 +30,13 @@ def test_overlay():
     overlay = load_overlay("probability")
     assert "σ-algebra" in overlay
     assert load_overlay("nonexistent") == ""
+
+
+SUBJECTS = Path(__file__).parents[1] / "subjects"
+
+
+@pytest.mark.parametrize(
+    "path", sorted(SUBJECTS.rglob("profile.yaml")), ids=lambda p: p.parent.name
+)
+def test_every_shipped_profile_parses(path):
+    SubjectProfile.model_validate(yaml.safe_load(path.read_text()))
