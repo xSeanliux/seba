@@ -116,7 +116,12 @@ class ToolHandler:
                 "completing a concept requires --evidence: name the specific "
                 "exchange in this session that demonstrated the learner has it"
             ), True
-        have = self.passes.get(call.id, 0)
+        # `passes` was counted at load; a reopen in this session restarts it now.
+        reopened_now = any(
+            c.id == call.id and c.status_change == "reopened"
+            for c in self.record.concepts
+        )
+        have = 0 if reopened_now else self.passes.get(call.id, 0)
         if call.status_change == "completed" and have < self.completion_passes:
             if call.id in self.carded:
                 return (

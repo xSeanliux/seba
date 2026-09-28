@@ -5,7 +5,14 @@ from fsrs import Card
 from typer.testing import CliRunner
 
 from seba.cli import app
-from seba.models import Concept, Item, SessionRecord, Status, Syllabus
+from seba.models import (
+    Concept,
+    Item,
+    SessionRecord,
+    Status,
+    Syllabus,
+    UpdateConcept,
+)
 from seba.store.store import Store
 
 runner = CliRunner()
@@ -315,3 +322,27 @@ def test_reopening_is_a_command(monkeypatch, tmp_path):
     runner.invoke(app, ["end", "prob", "--summary", "s", "--hint", "h"])
     assert _status(store) == "in-progress"
     assert _briefing()["teach_concept"]["id"] == "bayes"  # takes the teaching slot
+
+
+def test_a_reopened_concept_cannot_complete_in_the_same_session(monkeypatch, tmp_path):
+    store = seed(env(monkeypatch, tmp_path))
+    store.save_session(
+        "prob",
+        SessionRecord(
+            concepts=[UpdateConcept(id="bayes", status_change="started")],
+            complete=True,
+        ),
+        "t",
+        store.load_goal("prob"),
+    )
+    _finish_session("good")
+    _mark_done(store)
+    assert store.load_goal("prob").passes == {"bayes": 1}
+
+    runner.invoke(app, ["start", "prob"])
+    result = runner.invoke(app, ["concept", "prob", "bayes", "--status", "reopened"])
+    assert result.exit_code == 0, result.output
+    result = runner.invoke(
+        app, ["concept", "prob", "bayes", "--status", "completed", "--evidence", "x"]
+    )
+    assert result.exit_code == 1 and "0 of 1" in result.output

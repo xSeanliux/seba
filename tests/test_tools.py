@@ -190,3 +190,15 @@ def test_started_does_not_reopen_a_done_concept(handler):
         "update_concept", {"id": "bayes", "status_change": "started"}
     )
     assert err and "--status reopened" in text
+
+
+def test_reopening_restarts_the_count_within_the_session(handler):
+    _set_status(handler, Status.DONE)
+    handler.passes = {"bayes": 1}
+    _, err = handler.handle(
+        "update_concept", {"id": "bayes", "status_change": "reopened"}
+    )
+    assert not err
+    text, err2 = handler.handle("update_concept", COMPLETE)
+    assert err2 and "0 of 1" in text
+    assert [c.status_change for c in handler.record.concepts] == ["reopened"]
