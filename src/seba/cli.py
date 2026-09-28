@@ -203,7 +203,7 @@ def mint(
 def concept_cmd(
     goal: str,
     concept_id: str,
-    status: str | None = typer.Option(None, help="started|completed"),
+    status: str | None = typer.Option(None, help="started|completed|reopened"),
     note: str | None = typer.Option(None),
     evidence: str | None = typer.Option(
         None, help="required with --status completed: the exchange that showed it"

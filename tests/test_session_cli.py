@@ -5,7 +5,7 @@ from fsrs import Card
 from typer.testing import CliRunner
 
 from seba.cli import app
-from seba.models import Concept, Item, SessionRecord, Syllabus
+from seba.models import Concept, Item, SessionRecord, Status, Syllabus
 from seba.store.store import Store
 
 runner = CliRunner()
@@ -258,3 +258,60 @@ def test_a_hard_note_reaches_the_next_briefing(monkeypatch, tmp_path):
     assert f'hard: [bayes] it-1, passed with help — "{AWKWARD}".' in agenda["briefing"]
     # a `hard`-only session pulls no extra cards into the next
     assert agenda["review_items"] == []
+
+
+def _mark_done(store):
+    gs = store.load_goal("prob")
+    done = gs.syllabus.model_copy(
+        update={
+            "concepts": [
+                gs.syllabus.concepts[0].model_copy(update={"status": Status.DONE})
+            ]
+        }
+    )
+    store.save_session(
+        "prob",
+        SessionRecord(complete=True, summary="s", next_session_hint="h"),
+        "t",
+        gs.model_copy(update={"syllabus": done}),
+    )
+
+
+def _status(store):
+    return store.load_goal("prob").syllabus.concepts[0].status
+
+
+def test_a_slipping_card_is_reported_and_nothing_reopens(monkeypatch, tmp_path):
+    store = seed(env(monkeypatch, tmp_path))
+    _mark_done(store)
+
+    _finish_session("again", "--note", "confused e with x⁻¹")
+    assert _status(store) == "done"
+    agenda = _briefing()
+    assert "slipped: [bayes] it-1, 1 session running" in agenda["briefing"]
+    assert "confused e with x⁻¹" in agenda["briefing"]
+    assert [r["id"] for r in agenda["review_items"]] == ["it-1"]  # pulled in early
+
+    _finish_session("again", "--note", "same slip")
+    assert _status(store) == "done"
+    assert "slipped: [bayes] it-1, 2 sessions running" in _briefing()["briefing"]
+
+    _finish_session("good")
+    assert "slipped:" not in _briefing()["briefing"]
+
+
+def test_reopening_is_a_command(monkeypatch, tmp_path):
+    store = seed(env(monkeypatch, tmp_path))
+    runner.invoke(app, ["start", "prob"])
+    result = runner.invoke(app, ["concept", "prob", "bayes", "--status", "reopened"])
+    assert result.exit_code == 1 and "only a done concept" in result.output
+    runner.invoke(app, ["abandon", "prob", "--discard"])
+
+    _mark_done(store)
+    runner.invoke(app, ["start", "prob"])
+    result = runner.invoke(app, ["concept", "prob", "bayes", "--status", "reopened"])
+    assert result.exit_code == 0, result.output
+    runner.invoke(app, ["grade", "prob", "it-1", "good"])
+    runner.invoke(app, ["end", "prob", "--summary", "s", "--hint", "h"])
+    assert _status(store) == "in-progress"
+    assert _briefing()["teach_concept"]["id"] == "bayes"  # takes the teaching slot

@@ -80,43 +80,24 @@ def test_skipped_and_unknown_ids_are_safe():
     assert out.syllabus.concepts[0].status == "unseen"  # illegal move skipped, no error
 
 
-def done_state(recent: list[str] | None = None):
+def done_state():
     s = state()
     s.syllabus.concepts[0] = s.syllabus.concepts[0].model_copy(
         update={"status": "done"}
     )
-    return s.model_copy(update={"recent_by_item": {"it-1": recent or []}})
+    return s
 
 
-def test_lapsing_card_reopens_its_concept():
-    s = done_state(["good"])
-    rec = SessionRecord(reviews=[GradeReview(id="it-1", grade="again")])
-    out = apply_record(s, rec, NOW)
-    assert out.syllabus.concepts[0].status == "in-progress"
-
-
-def test_reopen_is_idempotent_and_ignores_older_lapses():
-    # a still-lapsing concept already reopened last session: no move, no error
-    s = state().model_copy(update={"recent_by_item": {"it-1": ["again"]}})
-    assert apply_record(s, SessionRecord(), NOW).syllabus.concepts[0].status == "unseen"
-    # an `again` older than the last two reviews no longer counts
-    stale = done_state(["again", "good", "good"])
-    assert (
-        apply_record(stale, SessionRecord(), NOW).syllabus.concepts[0].status == "done"
-    )
-
-
-def test_completed_this_session_beats_the_lapse():
-    s = state()
-    rec = SessionRecord(
-        reviews=[GradeReview(id="it-1", grade="again")],
-        concepts=[
-            UpdateConcept(id="bayes", status_change="started"),
-            UpdateConcept(id="bayes", status_change="completed", evidence="e"),
-        ],
-    )
-    out = apply_record(s, rec, NOW)
+def test_an_again_leaves_a_done_concept_done():
+    rec = SessionRecord(reviews=[GradeReview(id="it-1", grade="again", note="n")])
+    out = apply_record(done_state(), rec, NOW)
     assert out.syllabus.concepts[0].status == "done"
+
+
+def test_reopened_moves_done_to_in_progress():
+    rec = SessionRecord(concepts=[UpdateConcept(id="bayes", status_change="reopened")])
+    out = apply_record(done_state(), rec, NOW)
+    assert out.syllabus.concepts[0].status == "in-progress"
 
 
 def test_apply_record_uses_the_goals_settings_and_emphasis(monkeypatch):

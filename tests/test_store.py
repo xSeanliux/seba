@@ -165,7 +165,7 @@ def test_delayed_pass_needs_a_later_session(store):
     )
     gs2 = store.load_goal("prob")
     assert gs2.delayed_pass == {"bayes"}
-    assert gs2.recent_by_item == {"it-1": ["good", "easy"]}  # last two only
+    assert gs2.again_runs == {}
 
 
 def test_last_session_date_and_error_sites(store):

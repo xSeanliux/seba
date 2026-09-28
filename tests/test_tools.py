@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from seba.models import Agenda, Concept, ReviewItem, Syllabus
+from seba.models import Agenda, Concept, ReviewItem, Status, Syllabus
 from seba.session.tools import ToolHandler, mint_budget
 
 
@@ -154,3 +154,32 @@ def test_concept_without_cards_bypasses_the_delayed_check(handler):
 def test_unknown_tool(handler):
     _, err = handler.handle("nonsense", {})
     assert err
+
+
+def _set_status(handler, status):
+    handler.syllabus.concepts[0] = handler.syllabus.concepts[0].model_copy(
+        update={"status": status}
+    )
+
+
+def test_reopened_needs_a_done_concept(handler):
+    for status in (Status.UNSEEN, Status.IN_PROGRESS):
+        _set_status(handler, status)
+        text, err = handler.handle(
+            "update_concept", {"id": "bayes", "status_change": "reopened"}
+        )
+        assert err and "only a done concept can be reopened" in text
+    assert not handler.record.concepts
+    _set_status(handler, Status.DONE)
+    text, err = handler.handle(
+        "update_concept", {"id": "bayes", "status_change": "reopened"}
+    )
+    assert not err and text == "recorded"
+
+
+def test_started_does_not_reopen_a_done_concept(handler):
+    _set_status(handler, Status.DONE)
+    text, err = handler.handle(
+        "update_concept", {"id": "bayes", "status_change": "started"}
+    )
+    assert err and "--status reopened" in text

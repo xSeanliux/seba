@@ -161,7 +161,7 @@ class UpdateConcept(BaseModel):
     """Record concept progress or a note (misconception, strength)."""
 
     id: str
-    status_change: Literal["started", "completed"] | None = None
+    status_change: Literal["started", "completed", "reopened"] | None = None
     note: str | None = None
     # Required on `completed`, but enforced in ToolHandler, not here: this model
     # also parses historical outcomes written before the field existed, and a
@@ -206,7 +206,6 @@ class GoalState(BaseModel):
     session_number: int
     recent_grades: list[Grade] = Field(default_factory=list)
     recent_by_concept: dict[str, list[Grade]] = Field(default_factory=dict)
-    recent_by_item: dict[str, list[Grade]] = Field(default_factory=dict)
     grades_by_concept: dict[str, list[Grade]] = Field(default_factory=dict)  # all-time
     # Concepts with a card graded `again` in the most recent session only —
     # Rosenshine's "review where errors were made last time". `hard` is a pass

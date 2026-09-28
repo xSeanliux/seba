@@ -144,7 +144,6 @@ class Store:
         last_hint, recent_grades = None, []
         by_concept: dict[str, list[Grade]] = {}
         all_by_concept: dict[str, list[Grade]] = {}
-        by_item: dict[str, list[Grade]] = {}
         started_at: dict[str, int] = {}  # session a concept first went in-progress
         passed_at: dict[str, list[int]] = {}  # sessions with a good/easy card review
         last_errors: set[str] = set()
@@ -167,7 +166,6 @@ class Store:
                     again_runs.pop(r.id, None)
                 if last and r.grade in (Grade.AGAIN, Grade.HARD):
                     last_trouble.append(r)
-                by_item.setdefault(r.id, []).append(r.grade)
                 cid = concept_of.get(r.id)  # item may since have been deleted
                 if cid is not None:
                     all_by_concept.setdefault(cid, []).append(r.grade)
@@ -200,7 +198,6 @@ class Store:
             session_number=len(outcomes) + 1,
             recent_grades=recent_grades,
             recent_by_concept=by_concept,
-            recent_by_item={i: g[-2:] for i, g in by_item.items()},
             grades_by_concept=all_by_concept,
             last_session_errors=last_errors,
             again_runs=again_runs,

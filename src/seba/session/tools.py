@@ -9,6 +9,7 @@ from seba.models import (
     GradeReview,
     MintItem,
     SessionRecord,
+    Status,
     Syllabus,
     UpdateConcept,
 )
@@ -95,6 +96,16 @@ class ToolHandler:
     def _update_concept(self, call: UpdateConcept) -> tuple[str, bool]:
         if call.id not in {c.id for c in self.syllabus.concepts}:
             return f"unknown concept: '{call.id}'", True
+        status = next(c.status for c in self.syllabus.concepts if c.id == call.id)
+        if call.status_change == "reopened" and status != Status.DONE:
+            return (
+                f"'{call.id}' is {status}; only a done concept can be reopened"
+            ), True
+        if call.status_change == "started" and status == Status.DONE:
+            return (
+                f"'{call.id}' is done; reopening it is the learner's decision — "
+                "if they agree, use --status reopened"
+            ), True
         note = ""
         if call.status_change == "completed" and not (call.evidence or "").strip():
             # Naming the exchange moves the call from mastery attribution (which
