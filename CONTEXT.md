@@ -50,6 +50,11 @@ The learner's say on how often one concept's cards come back: less, normal, or
 more. It sits on top of the goal's default.
 _Avoid_: Priority, difficulty
 
+**Gap**:
+Something a concept depends on that the learner does not yet understand. Always
+about the learner, never about the field.
+_Avoid_: Research gap, open question
+
 **Dropped**:
 A concept the learner has set aside because the direction moved. It is no longer
 taught or reviewed, its history is kept, and it can be restored.

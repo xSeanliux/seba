@@ -1,147 +1,136 @@
-# Growing syllabus — design
+# Changing a syllabus after it starts — design
 
-Status: **draft, awaiting review.** No code written yet.
+Status: **draft, scope awaiting confirmation.** Rewritten after four rounds of
+design review. No code written yet. Terms are defined in `CONTEXT.md`.
 
-## What the learner asked for
+## Where this started, and where it landed
 
-One learner uses Seba for academic research and builds a curriculum of papers.
-The list is not known beforehand. The papers are related by an implicit
-curriculum that the research subject determines.
+The request came from a learner using Seba as a research companion: a curriculum
+of papers, not known in advance, related by the direction of the research.
 
-Success looks like: a goal can start with three papers and have thirty a few
-months later; each new paper lands in the right place in the graph; background
-the papers assume gets taught before the paper that needs it; and the learner
-can say "this one today" without fighting the scheduler.
+Review settled that a paper is a **source**, not a concept, and that sources and
+concepts map many to many. The model already allows that: a concept carries a
+list of sources. What the model does not allow is *change*. A syllabus is written
+once and nothing can add to it, remove from it, or steer it.
 
-## What blocks this today
-
-- The syllabus is written once, by `seba new-goal`. Nothing adds a concept
-  afterwards.
-- The concept to teach is the first `in-progress` one, else the first on the
-  frontier *in file order*. A paper appended last is taught last.
-- `Syllabus.goal`, the one-line statement of what the learner is after, never
-  reaches the tutor. The briefing carries the goal's short name only.
-- "Concepts done: 7/9" reads as progress toward an end that a growing syllabus
-  does not have.
-
-Everything else already fits. A paper is a concept with a URL in `sources`,
-prerequisite edges express "read this first", and the tutor already fetches a
-bounded slice of a source at teach time.
+That is a limit for every learner. Someone studying probability hits it when a
+missing prerequisite turns up in session four, when they decide to skip a
+chapter, or when they want chapter five today. So this change is scoped to what
+any goal can use, and contains nothing specific to research.
 
 ## Design
 
-### A. `seba extend`
+### 1. Mapping: adding concepts
 
 ```
 seba extend GOAL --from-file PATH
 ```
 
-The file holds a list of concepts in the existing schema. They are appended and
-the **merged** syllabus goes through the existing `validate()`: duplicate ids,
-unknown references, cycles. New concepts may name existing ones in `prereqs`,
-`soft_prereqs` and `confusable_with`. An id that already exists is refused; this
-command adds, it does not edit. A failed validation writes nothing.
+The file holds concepts in the existing schema. They are appended and the merged
+syllabus goes through the existing validation: duplicate ids, unknown
+references, cycles. New concepts may point at existing ones. An id that already
+exists is refused. A failed validation writes nothing.
 
-Works between sessions and during one. `ToolHandler` reloads the syllabus on
-every call, so a card can be minted against a concept added minutes earlier. The
-agenda of the session in progress is unchanged.
+Works between sessions and during one. The agenda of a session in progress is
+unchanged.
 
-### B. Choose what to teach
+Adding a source to a concept that already exists:
+
+```
+seba concept GOAL ID --add-source LOCATOR
+```
+
+Mapping is a conversation. The tutor skims the source's abstract and headings,
+drafts the concepts, names which existing concepts the source reuses, and
+revises with the learner. Nothing is saved without an explicit yes. Drafting
+defaults:
+
+- One to three concepts per source, each named by what the learner could explain
+  without the source in front of them.
+- Background a source assumes becomes its own concept and a hard prerequisite.
+  This is how a **gap** gets closed.
+- Sized to a session or two. Never carved by section.
+
+### 2. Dropping and restoring
+
+```
+seba concept GOAL ID --status dropped
+seba concept GOAL ID --status restored
+```
+
+A dropped concept leaves the frontier and the teaching slot, and its cards stop
+being reviewed. Its history, notes and cards are kept. Restoring returns it to
+the status it had.
+
+A concept that others depend on cannot be dropped while they are live; the
+refusal names them. Drop the dependents first, or remove the edge by hand.
+
+### 3. Steering
 
 ```
 seba start GOAL --concept ID
 ```
 
-Overrides the automatic pick for this session. The concept must be `in-progress`
-or on the frontier. If it has unmet hard prerequisites the command refuses and
-names them, because the edges are the curriculum. With a session already pending
-the flag is refused rather than silently ignored.
+Overrides the automatic pick for this session. The concept must be in progress
+or on the frontier. Unmet hard prerequisites are a refusal that names them,
+because those edges are the curriculum. Refused when a session is already
+pending.
 
-Without the flag the pick is unchanged.
+### 4. Direction
 
-### C. Give the tutor the direction
+The briefing opens with the goal's direction, which today never reaches the
+tutor. `seba tune GOAL --direction TEXT` changes it.
 
-The briefing opens with `Goal: <Syllabus.goal>`. For a research goal this line
-is the research question, and it is what the tutor steers by when proposing what
-to read next.
+When the direction changes, the tutor walks the unseen concepts with the learner
+and proposes drops one at a time.
 
-When at most one concept is left unseen, the briefing adds:
+When at most one concept is left unseen, the briefing says so and tells the
+tutor to propose what comes next or confirm the goal is finished.
 
-```
-syllabus nearly exhausted (1 unseen) — before closing, propose what comes next
-and add it with `seba extend`, or confirm the goal is finished.
-```
+### 5. Wording
 
-No `open_ended` flag. A fixed goal that runs out is finished, a growing one gets
-extended, and the learner knows which they have.
+Progress reads `7 done, 2 open, 1 dropped` rather than `7/9`.
 
-### D. Tutor protocol
+## Left out, and why
 
-A new `SKILL.md` section, "Growing a syllabus":
-
-- **When.** At the close, after the negotiation turn. Also whenever the learner
-  brings a paper, or the briefing says the syllabus is nearly exhausted.
-- **Where candidates come from.** The references of the paper just read; gaps
-  the session exposed; the goal line. The learner's own finds come first.
-- **How many.** One to three. The list grows at the pace it is read.
-- **Shape.** One paper is one concept, sized 1–3 sessions. A paper that needs
-  more is split along its contributions (method, main result), not its sections.
-  `sources` is the paper's URL plus the section, never the whole PDF.
-- **Edges are the implicit curriculum.** `prereqs` for a paper that cannot be
-  read without another; `soft_prereqs` for "helps". If a paper assumes background
-  the learner lacks, add that background as its own concept and make it a hard
-  prerequisite.
-- **Gate.** Show the proposed concepts and edges and get an explicit yes before
-  `seba extend`, as with a new goal.
-
-### E. Progress wording
-
-The briefing and the view say `7 done, 2 open` rather than `7/9`.
-
-## Deliberately left out
-
-- **Dropping a concept.** Research plans go stale, and a paper that stopped
-  mattering will sit on the frontier. `--concept` makes that survivable. A
-  `dropped` status touches the frontier, the view and the status state machine,
-  so it waits until the stale entries are a real nuisance. See open question 2.
-- **Editing edges after the fact.** Same reason.
-- **Automatic paper discovery or ranking.** The tutor proposes in conversation
-  with the tools it has. Seba stores what was agreed.
-- **Citation-graph import.** The edges that matter are the ones this learner
-  needs, which a citation graph does not know.
+| Idea | Why |
+|---|---|
+| Sources tracked in their own right (title, read state) | Specific to reading goals. A source enters through the concepts mapped from it |
+| Reading list in the view | Same. Derivable later from each concept's sources without new storage |
+| Steering by source | Same. Steering by concept covers it |
+| Recording open research questions | Out of scope: the tool is about what the learner knows |
+| Ranking ready concepts | The learner picks |
+| Editing prerequisite edges by command | Rare. The syllabus file can be edited by hand and is validated on load |
 
 ## Files touched
 
 | File | Change |
 |---|---|
-| `syllabus/graph.py` | `extend(syllabus, concepts)` — append, then `validate` |
-| `store/store.py` | `extend_goal` — write `syllabus.yaml`, commit |
-| `scheduler/agenda.py` | `teach` override; goal line; exhaustion line; wording |
-| `cli.py` | `extend`; `start --concept` |
-| `ui/view.py`, `view_template.html` | progress wording |
-| `skills/seba-tutor/SKILL.md` | command table; "Growing a syllabus" |
+| `models.py` | `Status.DROPPED`; status to restore to |
+| `syllabus/graph.py` | `extend`; dropped excluded from frontier; drop and restore moves |
+| `store/store.py` | write syllabus on extend; direction |
+| `scheduler/agenda.py` | teach override; direction and exhaustion lines; dropped cards excluded; wording |
+| `session/tools.py` | `dropped`, `restored`, `--add-source` |
+| `cli.py` | `extend`; `start --concept`; `tune --direction` |
+| `ui/view.py`, `view_template.html` | dropped shown; wording |
+| `skills/seba-tutor/SKILL.md` | command table; "Changing a syllabus" |
 
 ## Testing
 
-- Extending with a concept whose prerequisite already exists succeeds, and the
-  concept appears on the frontier once that prerequisite is done.
+- Extending with a concept whose prerequisite already exists succeeds, and it
+  reaches the frontier once that prerequisite is done.
 - Extending with a duplicate id, an unknown reference, or a cycle through an
-  existing concept is refused and leaves `syllabus.yaml` byte-identical.
-- `start --concept` picks the named concept over an earlier frontier entry.
-- `start --concept` on a concept with unmet hard prerequisites is refused and
-  names them.
-- `start --concept` with a session pending is refused.
-- The briefing carries the goal line, and the exhaustion line at one unseen
+  existing concept is refused and leaves the syllabus file byte-identical.
+- Extending during a pending session lets a card be minted on the new concept.
+- A dropped concept is absent from the frontier and the agenda, and its due
+  cards are not reviewed. Restoring brings back its status and its cards.
+- Dropping a concept with a live dependent is refused and names the dependent.
+- `start --concept` picks the named concept over an earlier frontier entry; it is
+  refused on unmet prerequisites, on a dropped concept, and with a session pending.
+- The briefing carries the direction, and the exhaustion line at one unseen
   concept but not at two.
-- Extending during a pending session lets `mint` accept the new concept.
 
-## Open questions
+## Depends on
 
-1. **Who finds the papers?** The design assumes both: the learner brings some,
-   the tutor proposes others, the learner approves all. If this learner only
-   ever brings their own, section D shrinks to "place it in the graph".
-2. **Dropping.** Is a stale frontier already a problem for them?
-3. **Paper as the unit.** One paper per concept is the default here. The
-   alternative makes ideas the concepts and papers their sources, which suits a
-   survey-style goal better but needs the ideas known up front, and that is the
-   thing this learner does not have.
+The settings block and `seba tune` from the scheduling change. This one lands
+second.

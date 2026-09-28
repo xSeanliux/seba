@@ -1,181 +1,168 @@
 # Scheduling controls — design
 
-Status: **draft, awaiting review.** No code written yet.
+Status: **draft, awaiting confirmation.** Rewritten after four rounds of design
+review. No code written yet. Terms are defined in `CONTEXT.md`.
 
 ## What the learner asked for
 
 > Often a concept is marked as easy and just skipped, while concepts that were
 > failed the first few times come up over and over for weeks on end. More
-> control over thresholds (when a thing is done, spaced-repetition thresholds),
-> ideally adaptive.
+> control over thresholds, ideally adaptive.
 
-Success looks like: a card that was passed with hesitation stops appearing every
-session; a card that was called `easy` twice does not vanish for a year; the
-learner can turn the dials themselves; and the system notices when a card is
-going nowhere instead of repeating it.
+## The principle that came out of review
+
+py-fsrs schedules cards. It knows nothing about concepts, completion, or what
+gets taught; all of that is Seba's layer. Every fault found sits where Seba acts
+on top of the scheduler, never inside it. So the rule for this change is:
+**the scheduler decides when a card comes back, and Seba stops second-guessing
+it.** Seba changes what it feeds the scheduler and what it tells the tutor.
 
 ## What the data says
 
 Measured on the `category-theory` goal (11 sessions, 18 cards) and reproduced
 with a py-fsrs simulation (sessions 3 days apart, fuzz off).
 
-**1. Learning steps are in minutes; sessions are days apart.** `Scheduler()`
-runs on py-fsrs defaults: learning steps of 1 and 10 minutes, built for
-re-showing a card inside one Anki sitting. In the Learning state `hard` does not
-advance the step, so the interval stays at zero days and the card is due at
-every session until it collects two `good`s. Seba's rubric makes `hard` a pass
-("correct but with hesitation"), so a pass is being scheduled as a failure.
+| Finding | Cause |
+|---|---|
+| Card `it-b2c8b232` reviewed in eight consecutive sessions | Learning steps are 1 and 10 minutes, meant for re-showing a card in the same sitting. `hard` never advances the step, so the interval stays at zero days |
+| Same | A `hard` grade pulls every card of that concept into the next session, due or not. They get graded `hard` again and the pull repeats |
+| `monoids-groups` completed three times | One `again` reopens the concept, and the check reads each card's last two grades whether or not it was reviewed this session, so an old `again` keeps firing |
+| Card `it-5adb868a` due four months out after two reviews | Two `easy` grades give 8 → 66 → 397 days with no ceiling |
 
-| History | Default | No learning steps |
+| History | Today | Learning steps removed |
 |---|---|---|
 | again, hard, hard, hard, hard, good, easy | 0, 0, 0, 0, 0, 0, 15 days | 1, 2, 4, 7, 10, 17, 35 days |
 
-Card `it-b2c8b232` (monoids-groups) was reviewed in eight consecutive sessions:
-again, hard, hard, hard, hard, good, skipped, easy.
-
-**2. The warm-review pull feeds itself.** `last_session_errors` counts `hard` as
-an error and pulls *every* card of that concept into the next session whether
-due or not. Those cards get graded `hard` again, which puts the concept back in
-`last_session_errors`.
-
-**3. `easy` compounds fast.** Two `easy` grades give 8 → 66 → 397 days. Card
-`it-5adb868a` has two reviews and is next due four months out. The grader is an
-LLM reading a conversation, and the research notes already flag over-grading as
-the likely failure (`09-review-scheduling.md` §10).
-
-**4. One dial cannot fix both.** Raising `desired_retention` to 0.95 brings the
-easy card back sooner (3 → 14 → 52 days) but makes the struggling card *more*
-frequent (1, 1, 2, 3, 3, 4 days). The two complaints pull in opposite
-directions, so they need separate fixes.
-
 ## Design
 
-Four parts, smallest first. Parts A and B change defaults; C adds the dials; D
-is the adaptive piece.
+### 1. Feed the scheduler correctly
 
-### A. Fix the defaults
+- Build it with no learning steps and no relearning steps. Every grade then
+  yields at least a day, and `hard` grows the interval. Cards now in the
+  Learning state graduate at their next review. No data migration.
+- Build it with the goal's interval ceiling (default 180 days).
+- `easy` is passed through as `easy`. No damping.
 
-- Build the scheduler with `learning_steps=()` and `relearning_steps=()`. Every
-  grade then yields an interval of at least a day, and `hard` grows it. Cards
-  currently in the Learning state graduate on their next review; py-fsrs handles
-  an empty step list on a card that has a step set. No data migration.
-- `last_session_errors` counts `again` only. With A in place an `again` card is
-  due the next day regardless, so the pull still brings in its siblings, which
-  is what Rosenshine's daily review is for.
+### 2. `hard` is a pass, and says why
 
-### B. Damp early `easy`
+`hard` means correct with significant help. The interval grows. Grading `hard`
+or `again` requires a note saying what the help was for or what went wrong;
+the command refuses without one. The next briefing shows that note beside the
+concept.
 
-An `easy` is recorded as `good` for scheduling until the card has passed
-(`good`/`easy`) in an earlier session. The grade in the session outcome stays
-`easy`; only the FSRS update is damped. First-ever `easy` then gives 2 days
-rather than 8, and the 66-day jump needs two sessions of evidence.
+Today grade notes are written to the session outcome and never read again.
 
-Rejected: exposing FSRS weights (unreadable), and capping interval growth as a
-multiple of the last interval (a second scheduler fighting the first).
+### 3. Only `again` pulls cards in early
 
-### C. Per-goal settings
+`hard` no longer counts as an error site. Its note reaches the tutor through the
+briefing, so the tutor can touch on it in conversation without disturbing the
+schedule.
 
-A `settings` block in `goal.yaml`, all optional, defaults shown:
+### 4. Nothing reopens by itself
+
+The automatic reopen is removed, and the stale-grade fault goes with it. A card
+graded `again` comes back when the scheduler says. The briefing reports it:
+
+```
+slipped: [monoids-groups] it-0c151259, 2 sessions running — "confused the
+identity element with the inverse". Propose re-teaching if the repair doesn't hold.
+```
+
+Reopening happens when the learner agrees to it: `seba concept GOAL ID --status
+reopened`. A reopened concept takes a teaching slot, as an in-progress concept
+does today.
+
+### 5. Settings, per goal
 
 ```yaml
 settings:
-  desired_retention: 0.9     # 0.70–0.97; higher = more reviews of everything
-  max_interval_days: 180     # ceiling on any card's interval
-  completion_passes: 1       # later-session passes required before `completed`
+  desired_retention: 0.9       # 0.70–0.97
+  max_interval_days: 180
+  concepts_per_session: 1      # up to this many
+  completion_passes: 1         # later-session passes before `completed`
+emphasis:
+  functors: more               # less | more; absent means normal
 ```
 
-- Per goal rather than per subject: an exam in six weeks and lifelong Italian
-  want different schedules from the same subject profile.
-- `max_interval_days` defaults to 180, down from py-fsrs's 36,500. This is a
-  behaviour change for existing goals and only bites cards already past 180
-  days.
-- `completion_passes` generalises the existing delayed-pass gate. `delayed_pass:
-  set[str]` on `GoalState` becomes a count per concept; the refusal message
-  names how many passes are still owed.
-- New settings apply at each card's next review. Due dates already stored are
-  not rewritten.
+- `concepts_per_session` is a ceiling. The agenda lists that many ready concepts
+  in order and the tutor starts the next only once the current one reaches a
+  stopping point.
+- `completion_passes` generalises the existing delayed-pass gate. The learner's
+  original request named it; it was not examined in review. See "To confirm".
+- Settings take effect at each card's next review. Stored due dates are not
+  rewritten, with one exception below.
 
-One command, because the learner talks to the tutor rather than editing YAML:
+### 6. Emphasis, per concept
 
-```
-seba tune GOAL                          # print current settings
-seba tune GOAL --retention 0.85 --max-interval 120 --completion-passes 2
-```
+Three levels. `more` reviews that concept's cards against a higher retention
+target than the goal's (+0.05, capped at 0.97); `less` against a lower one
+(−0.10, floored at 0.70). Setting `more` also makes the concept's cards due now,
+so a learner who says "I keep losing functors" on Monday sees functors on
+Tuesday.
 
-Out-of-range values are refused with the valid range. The change is committed to
-the data repo like everything else.
-
-`SKILL.md` gains a short section: when the learner says reviews are too frequent
-or too sparse, say what the dial does, confirm the value, run `seba tune`.
-
-Not exposed: `STUCK_RATE`, `STUCK_MIN_OPPORTUNITIES`, `LAPSE_DAYS`,
-`SYNTHESIS_EVERY`, the pace cutoffs. Nobody has asked for them. They move into
-`settings` when someone does.
-
-### D. Adaptive: leeches, not parameter fitting
-
-A card reviewed four or more times with no `good`/`easy` in its last four is a
-**leech**. The briefing gets a line, in the style of the existing `stuck:` line:
+### 7. One command
 
 ```
-leech: [it-b2c8b232] (monoids-groups) 4 reviews without a clean pass —
-the card is the problem: rewrite or split it, then retire the old one.
+seba tune GOAL                                   # print settings and emphasis
+seba tune GOAL --retention 0.85 --max-interval 120
+seba tune GOAL --concepts-per-session 2
+seba tune GOAL --concept functors --emphasis more
 ```
 
-`seba retire GOAL ITEM_ID` sets the existing `Item.suspended` flag, which
-nothing can currently set. The tutor mints the replacement with `seba mint`.
+Out-of-range values are refused with the valid range. Works with or without a
+session in progress. Committed to the data repo like everything else.
 
-This adapts the *material* rather than the *parameters*, which is the right
-order at this scale:
+### 8. Adaptive, in the sense agreed
 
-- FSRS's own optimizer needs a few hundred reviews and pulls in torch. The
-  largest goal has about sixty. Revisit when a goal passes ~400 reviews.
-- Auto-tuning `desired_retention` from measured recall is one function, but it
-  steers on LLM-assigned grades. If the grader inflates, measured recall reads
-  high and the controller *lengthens* intervals, which is complaint one again.
-  Deferred until grades can be trusted; see open question 3.
+The learner's statement comes first, grades second. Nothing tunes itself in this
+version. Grades decide what the tutor *proposes* in the closing negotiation
+("functors came back `again` twice — want it more often?"), and the learner's
+answer is what changes a setting. The tutor always says which setting changed
+and to what.
+
+## Removed from the first draft
+
+| Idea | Why it went |
+|---|---|
+| Leech detection | The scheduler has no such notion; the card continues on schedule |
+| Damping `easy` | Overrides the scheduler. Its own ceiling and retention target cover the case |
+| Automatic reopen | Replaced by a briefing line and the learner's decision |
+| Retention auto-tuning | Would steer on grades alone |
 
 ## Files touched
 
 | File | Change |
 |---|---|
-| `models.py` | `GoalSettings`; `GoalState.settings`; `delayed_pass` becomes a count |
-| `scheduler/items.py` | scheduler built from settings; `easy` damping |
-| `scheduler/apply.py` | passes settings and pass history through |
-| `scheduler/agenda.py` | leech lines |
-| `store/store.py` | read/write `settings`; `again`-only errors; pass counts |
-| `session/tools.py` | `completion_passes` in the gate |
-| `cli.py` | `tune`, `retire` |
-| `skills/seba-tutor/SKILL.md` | tuning section; leech line in the briefing list |
+| `models.py` | `GoalSettings`, emphasis; `Agenda.teach_concepts`; pass counts replace `delayed_pass` |
+| `scheduler/items.py` | scheduler built from settings and emphasis |
+| `scheduler/apply.py` | automatic reopen deleted |
+| `scheduler/agenda.py` | slipped and hard-note lines; up to N concepts |
+| `store/store.py` | settings read/write; `again`-only errors; grade notes and pass counts loaded |
+| `session/tools.py` | note required on `hard`/`again`; `reopened`; `completion_passes` |
+| `cli.py` | `tune`; `--status reopened` |
+| `skills/seba-tutor/SKILL.md` | rubric for `hard`; new briefing lines; tuning; session length |
+| `subjects/_templates/analytic/profile.yaml` | remove two stray lines (separate commit) |
 
 ## Testing
 
-One test per behaviour, in the existing test files:
-
-- `hard` on a new card yields an interval of at least one day.
-- The struggler history above produces strictly growing intervals.
-- First `easy` schedules as `good`; `easy` after an earlier-session pass
-  schedules as `easy`.
+- `hard` on a new card yields an interval of at least one day, and the struggler
+  history above produces strictly growing intervals.
 - No interval exceeds `max_interval_days`.
-- `completed` is refused at one pass when `completion_passes: 2`, accepted at two.
-- A `hard`-only session leaves `last_session_errors` empty.
-- A four-review card with no clean pass produces a leech line; a retired card
-  leaves the agenda.
-- `seba tune` round-trips through `goal.yaml` and refuses out-of-range values.
-- A `goal.yaml` with no `settings` block loads with defaults.
+- `grade ... hard` without a note is refused; with one, the note appears in the
+  next briefing.
+- A `hard`-only session pulls no extra cards into the next.
+- An `again` on a done concept leaves it done and produces a slipped line; the
+  count rises when it happens again and resets after a pass.
+- `--status reopened` moves done to in-progress and is refused from any other status.
+- `concepts_per_session: 2` lists two concepts when two are ready, one when one is.
+- Emphasis `more` makes the concept's cards due today and shortens the next
+  interval relative to normal; `less` lengthens it.
+- `completed` is refused at one pass when `completion_passes: 2`.
+- `seba tune` round-trips through `goal.yaml`, refuses out-of-range values, and
+  a goal with no settings block loads with defaults.
+- A pending session saved before this change still loads.
 
-## Open questions
+## To confirm
 
-1. **`max_interval_days` default.** 180 is a guess. 365 is the conservative
-   alternative; FSRS's 36,500 is "no ceiling".
-2. **`easy` damping rule.** The proposal needs one earlier-session pass. The
-   stricter version never trusts `easy` on a card's first two reviews.
-3. **Retention auto-tune.** Deferred above. If wanted anyway, it should steer on
-   the learner's answer in the closing negotiation ("Y shaky — fair?") rather
-   than on grades.
-
-## Unrelated, found on the way
-
-`subjects/_templates/analytic/profile.yaml` ends with two stray lines,
-`</content>` and `</invoke>`, committed in `d28ed71`. Anyone copying that
-template gets a profile that fails to parse. Two-line deletion, separate commit.
+1. `completion_passes` stays in, default 1.
+2. Emphasis offsets of +0.05 and −0.10.
