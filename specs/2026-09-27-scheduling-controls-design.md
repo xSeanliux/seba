@@ -131,7 +131,7 @@ and to what.
 
 | File | Change |
 |---|---|
-| `models.py` | `GoalSettings`, emphasis; `Agenda.teach_concepts`; pass counts replace `delayed_pass` |
+| `models.py` | `GoalSettings`, emphasis; `Agenda.next_concepts`; pass counts replace `delayed_pass` |
 | `scheduler/items.py` | scheduler built from settings and emphasis |
 | `scheduler/apply.py` | automatic reopen deleted |
 | `scheduler/agenda.py` | slipped and hard-note lines; up to N concepts |
