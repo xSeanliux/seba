@@ -350,6 +350,24 @@ def test_a_reopened_concept_cannot_complete_in_the_same_session(monkeypatch, tmp
     assert result.exit_code == 1 and "0 of 1" in result.output
 
 
+def test_a_concept_first_carded_this_session_cannot_complete_in_it(
+    monkeypatch, tmp_path
+):
+    seed(env(monkeypatch, tmp_path), with_item=False)
+    runner.invoke(app, ["start", "prob"])
+    runner.invoke(app, ["concept", "prob", "bayes", "--status", "started"])
+    result = runner.invoke(
+        app,
+        ["mint", "prob", "--concept", "bayes", "--type", "recall"]
+        + ["--front", "f", "--back", "b"],
+    )
+    assert result.exit_code == 0, result.output
+    result = runner.invoke(
+        app, ["concept", "prob", "bayes", "--status", "completed", "--evidence", "x"]
+    )
+    assert result.exit_code == 1 and "0 of 1" in result.output
+
+
 def _goal_yaml(data):
     return yaml.safe_load((data / "goals" / "prob" / "goal.yaml").read_text())
 

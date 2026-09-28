@@ -158,6 +158,16 @@ def test_concept_without_cards_bypasses_the_delayed_check(handler):
     assert not err and "no cards" in text
 
 
+def test_a_card_minted_this_session_gates_completion(handler):
+    handler.carded = set()  # nothing on disk yet
+    handler.handle(
+        "mint_item", {"concept": "bayes", "type": "recall", "front": "f", "back": "b"}
+    )
+    text, err = handler.handle("update_concept", COMPLETE)
+    assert err and "0 of 1" in text
+    assert not handler.record.concepts
+
+
 def test_unknown_tool(handler):
     _, err = handler.handle("nonsense", {})
     assert err

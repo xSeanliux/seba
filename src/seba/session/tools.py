@@ -123,7 +123,10 @@ class ToolHandler:
         )
         have = 0 if reopened_now else self.passes.get(call.id, 0)
         if call.status_change == "completed" and have < self.completion_passes:
-            if call.id in self.carded:
+            # `carded` was read at load; a card minted this session counts too.
+            if call.id in self.carded or any(
+                m.concept == call.id for m in self.record.new_items
+            ):
                 return (
                     f"'{call.id}' has {have} of {self.completion_passes} unaided "
                     "pass(es) in a later session; each is a good/easy review of "
