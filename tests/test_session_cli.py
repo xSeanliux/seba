@@ -90,6 +90,19 @@ def test_malformed_pending_fails_cleanly(monkeypatch, tmp_path):
     assert "session.pending.yaml" in result.output
 
 
+def test_malformed_goal_yaml_fails_cleanly(monkeypatch, tmp_path):
+    data = env(monkeypatch, tmp_path)
+    seed(data)
+    path = data / "goals" / "prob" / "goal.yaml"
+    path.write_text(path.read_text() + "settings:\n  desired_retention: banana\n")
+    for cmd in (["start", "prob"], ["view", "prob", "--json"], ["status"]):
+        result = runner.invoke(app, cmd)
+        assert result.exit_code == 1, cmd
+        assert "goal.yaml" in result.output
+        assert "Traceback" not in result.output
+        assert result.exception is None or isinstance(result.exception, SystemExit)
+
+
 def test_resume_without_subject_profile(monkeypatch, tmp_path):
     data = env(monkeypatch, tmp_path)
     seed(data)

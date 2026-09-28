@@ -5,6 +5,8 @@ import yaml
 import pytest
 from seba.models import (
     Concept,
+    Emphasis,
+    GoalSettings,
     GradeReview,
     Item,
     MintItem,
@@ -214,3 +216,72 @@ def test_historical_completed_without_evidence_still_loads(tmp_path):
     }
     (tmp_path / "goals/g/sessions/001.outcomes.yaml").write_text(yaml.safe_dump(old))
     assert store.load_goal("g").session_number == 2
+
+
+def _goal_yaml(store):
+    return store.data_dir / "goals" / "prob" / "goal.yaml"
+
+
+def _commits(store):
+    return subprocess.run(
+        ["git", "log", "--oneline"], cwd=store.data_dir, capture_output=True, text=True
+    ).stdout.splitlines()
+
+
+def test_goal_without_a_settings_block_loads_defaults(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob")
+    assert gs.settings == GoalSettings() and gs.emphasis == {}
+
+
+def test_save_tuning_roundtrip(store):
+    store.create_goal("prob", syl(), "probability")
+    settings = GoalSettings(desired_retention=0.85, max_interval_days=120)
+    assert store.save_tuning("prob", settings, {"bayes": Emphasis.MORE}, [item()])
+    gs = store.load_goal("prob")
+    assert gs.settings == settings
+    assert gs.emphasis == {"bayes": "more"}
+    assert gs.items[0].id == "it-1" and gs.subject == "probability"
+    assert "prob: tuned" in _commits(store)[0]
+
+
+def test_save_tuning_does_not_commit_when_nothing_changed(store):
+    store.create_goal("prob", syl(), "probability")
+    settings = GoalSettings(desired_retention=0.85)
+    assert store.save_tuning("prob", settings, {}, [])
+    before = _commits(store)
+    assert store.save_tuning("prob", settings, {}, []) is False
+    assert _commits(store) == before
+
+
+def test_save_tuning_keeps_unknown_keys(store):
+    store.create_goal("prob", syl(), "probability")
+    path = _goal_yaml(store)
+    path.write_text(path.read_text() + "colour: teal\n")
+    store.save_tuning("prob", GoalSettings(), {}, [])
+    assert yaml.safe_load(path.read_text())["colour"] == "teal"
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        "settings:\n  desired_retention: 2.0\n",
+        "settings:\n  desired_retention: banana\n",
+        "settings:\n  max_interval_days: 0\n",
+        "settings: nonsense\n",
+        "emphasis:\n  bayes: lots\n",
+    ],
+)
+def test_malformed_goal_yaml_names_the_file(store, block):
+    store.create_goal("prob", syl(), "probability")
+    path = _goal_yaml(store)
+    path.write_text(path.read_text() + block)
+    with pytest.raises(StoreError, match="goal.yaml"):
+        store.load_goal("prob")
+
+
+def test_emphasis_on_an_unknown_concept_is_ignored_at_load(store):
+    store.create_goal("prob", syl(), "probability")
+    path = _goal_yaml(store)
+    path.write_text(path.read_text() + "emphasis:\n  ghost: more\n  bayes: less\n")
+    assert store.load_goal("prob").emphasis == {"bayes": "less"}

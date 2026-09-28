@@ -6,7 +6,17 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from seba.models import GoalState, GoalSummary, Grade, Item, SessionRecord, Syllabus
+from seba.models import (
+    Emphasis,
+    GoalMeta,
+    GoalSettings,
+    GoalState,
+    GoalSummary,
+    Grade,
+    Item,
+    SessionRecord,
+    Syllabus,
+)
 from seba.syllabus.graph import SyllabusError, load_syllabus
 
 
@@ -77,6 +87,44 @@ class Store:
                 raise StoreError(f"{path.name}:{n}: {e}") from e
         return items
 
+    def _load_meta(self, path: Path) -> GoalMeta:
+        try:
+            return GoalMeta.model_validate(yaml.safe_load(path.read_text()))
+        except (yaml.YAMLError, ValidationError) as e:
+            raise StoreError(f"{path.name}: {e}") from e
+
+    def _write_items(self, gdir: Path, items: list[Item]) -> None:
+        tmp = gdir / "items.jsonl.tmp"
+        tmp.write_text(
+            "".join(json.dumps(i.model_dump(mode="json")) + "\n" for i in items)
+        )
+        tmp.rename(gdir / "items.jsonl")
+
+    def save_tuning(
+        self,
+        name: str,
+        settings: GoalSettings,
+        emphasis: dict[str, Emphasis],
+        items: list[Item],
+    ) -> bool:
+        """Write settings, emphasis and cards. Commits only if something changed:
+        `_git` runs with check=True and an empty commit fails."""
+        gdir = self._goal_dir(name)
+        path = gdir / "goal.yaml"
+        meta = self._load_meta(path).model_copy(
+            update={"settings": settings, "emphasis": emphasis}
+        )
+        path.write_text(yaml.safe_dump(meta.model_dump(mode="json"), sort_keys=False))
+        self._write_items(gdir, items)
+        self._git("add", f"goals/{name}/goal.yaml", f"goals/{name}/items.jsonl")
+        staged = subprocess.run(
+            ["git", "diff", "--cached", "--quiet"], cwd=self.data_dir
+        )
+        if staged.returncode == 0:
+            return False
+        self._git("commit", "-m", f"{name}: tuned")
+        return True
+
     def _outcomes_files(self, name: str) -> list[Path]:
         return sorted(self._goal_dir(name).glob("sessions/*.outcomes.yaml"))
 
@@ -84,8 +132,8 @@ class Store:
         gdir = self._goal_dir(name)
         if not gdir.exists():
             raise StoreError(f"no such goal: '{name}'")
+        meta = self._load_meta(gdir / "goal.yaml")
         try:
-            meta = yaml.safe_load((gdir / "goal.yaml").read_text())
             syllabus = load_syllabus(gdir / "syllabus.yaml")
         except (yaml.YAMLError, SyllabusError) as e:
             raise StoreError(str(e)) from e
@@ -128,10 +176,16 @@ class Store:
                 last_hint = rec.next_session_hint or last_hint
         return GoalState(
             name=name,
-            subject=meta["subject"],
+            subject=meta.subject,
             syllabus=syllabus,
             items=items,
             notes=(gdir / "notes.md").read_text(),
+            settings=meta.settings,
+            emphasis={
+                cid: e
+                for cid, e in meta.emphasis.items()
+                if cid in {c.id for c in syllabus.concepts}
+            },
             last_hint=last_hint,
             session_number=len(outcomes) + 1,
             recent_grades=recent_grades,
@@ -168,11 +222,7 @@ class Store:
         )
         (sdir / f"{n}.transcript.md").write_text(transcript)
 
-        tmp = gdir / "items.jsonl.tmp"
-        tmp.write_text(
-            "".join(json.dumps(i.model_dump(mode="json")) + "\n" for i in updated.items)
-        )
-        tmp.rename(gdir / "items.jsonl")
+        self._write_items(gdir, updated.items)
         (gdir / "syllabus.yaml").write_text(
             yaml.safe_dump(updated.syllabus.model_dump(mode="json"), sort_keys=False)
         )

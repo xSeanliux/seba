@@ -2,7 +2,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ItemType(StrEnum):
@@ -39,6 +39,33 @@ class PaceHint(StrEnum):
     PUSH_HARDER = "push-harder"
     STEADY = "steady"
     STEP_BACK = "step-back"
+
+
+RETENTION_MIN = 0.70
+RETENTION_MAX = 0.97
+
+
+class Emphasis(StrEnum):
+    LESS = "less"
+    MORE = "more"  # normal is the absence of an entry
+
+
+class GoalSettings(BaseModel):
+    desired_retention: float = Field(0.9, ge=RETENTION_MIN, le=RETENTION_MAX)
+    max_interval_days: int = Field(180, ge=1)
+    concepts_per_session: int = Field(1, ge=1, le=5)
+    completion_passes: int = Field(1, ge=1)
+
+
+class GoalMeta(BaseModel):
+    """goal.yaml. Unknown keys are kept so a hand-edited file survives a rewrite."""
+
+    model_config = ConfigDict(extra="allow")
+
+    name: str
+    subject: str
+    settings: GoalSettings = Field(default_factory=GoalSettings)
+    emphasis: dict[str, Emphasis] = Field(default_factory=dict)
 
 
 class Concept(BaseModel):
@@ -172,6 +199,8 @@ class GoalState(BaseModel):
     syllabus: Syllabus
     items: list[Item]
     notes: str = ""
+    settings: GoalSettings = Field(default_factory=GoalSettings)
+    emphasis: dict[str, Emphasis] = Field(default_factory=dict)
     last_hint: str | None = None
     session_number: int
     recent_grades: list[Grade] = Field(default_factory=list)

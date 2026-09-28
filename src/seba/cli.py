@@ -5,7 +5,7 @@ import typer
 import yaml
 
 from seba import config
-from seba.models import PendingSession, SubjectProfile
+from seba.models import GoalState, PendingSession, SubjectProfile
 from seba.scheduler.agenda import build_agenda
 from seba.scheduler.apply import apply_record
 from seba.session.loader import load_overlay, load_profile
@@ -17,7 +17,7 @@ from seba.session.pending import (
     save_pending,
 )
 from seba.session.tools import ToolHandler
-from seba.store.store import Store
+from seba.store.store import Store, StoreError
 from seba.syllabus.graph import SyllabusError, load_syllabus
 from seba.ui import repl
 from seba.ui.view import build_view_data, render_view
@@ -40,6 +40,15 @@ def _profile(subject: str) -> SubjectProfile:
         )
         raise typer.Exit(1)
     return p
+
+
+def _load_goal(store: Store, goal: str) -> GoalState:
+    """load_goal, but turn a StoreError into a clean stderr + exit 1."""
+    try:
+        return store.load_goal(goal)
+    except StoreError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
 
 
 @app.command("new-goal")
@@ -67,7 +76,11 @@ def new_goal(
 
 @app.command()
 def status():
-    goals = _store().list_goals()
+    try:
+        goals = _store().list_goals()
+    except StoreError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
     if not goals:
         typer.echo("no goals yet")
         return
@@ -98,7 +111,7 @@ def _session(goal: str):
             f"no session in progress for '{goal}' — run: seba start {goal}", err=True
         )
         raise typer.Exit(1)
-    state = store.load_goal(goal)
+    state = _load_goal(store, goal)
     handler = ToolHandler(
         pending.agenda,
         state.syllabus,
@@ -122,7 +135,7 @@ def _dispatch(goal: str, tool: str, args: dict) -> None:
 
 
 def _finish(store: Store, goal: str, pending: PendingSession, ppath) -> None:
-    state = store.load_goal(goal)
+    state = _load_goal(store, goal)
     updated = apply_record(state, pending.record, datetime.now(timezone.utc))
     # Save durably BEFORE clearing pending: a crash inside save_session (file
     # writes + git) must never leave the session lost with the pending gone.
@@ -136,7 +149,7 @@ def _finish(store: Store, goal: str, pending: PendingSession, ppath) -> None:
 @app.command()
 def start(goal: str):
     store = _store()
-    state = store.load_goal(goal)
+    state = _load_goal(store, goal)
     ppath = pending_path(store.data_dir, goal)
     pending = _load_pending_or_exit(ppath)
     if pending is None:
@@ -246,7 +259,7 @@ def view(
     open_browser: bool = typer.Option(False, "--open", help="open the rendered view"),
 ):
     store = _store()
-    state = store.load_goal(goal)
+    state = _load_goal(store, goal)
     data = build_view_data(state, date.today())
     if json_out:
         typer.echo(data.model_dump_json())
