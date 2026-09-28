@@ -2,6 +2,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+import yaml
 from seba.models import Agenda, GradeReview, PendingSession, ReviewItem
 from seba.session.pending import (
     PendingError,
@@ -60,3 +61,36 @@ def test_clear_is_idempotent(tmp_path: Path):
     clear_pending(p)
     assert not p.exists()
     clear_pending(p)  # no error on second call
+
+
+def test_a_pending_session_saved_before_next_concepts_still_loads(tmp_path):
+    path = tmp_path / "session.pending.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "goal": "g",
+                "started": "2026-09-01",
+                "agenda": {
+                    "goal": "g",
+                    "subject": "probability",
+                    "session_number": 3,
+                    "briefing": "b",
+                    "review_items": [],
+                    "teach_concept": {"id": "a", "name": "A"},
+                    "practice_quota": 3,
+                    "pace_hint": "steady",
+                },
+                "record": {
+                    "reviews": [{"id": "it-1", "grade": "hard", "note": None}],
+                    "concepts": [],
+                    "new_items": [],
+                },
+            }
+        )
+    )
+    pending = load_pending(path)
+    assert pending.agenda.teach_concept.id == "a"
+    assert pending.agenda.next_concepts == []
+    assert (
+        pending.record.reviews[0].grade == "hard"
+    )  # graded before notes were required

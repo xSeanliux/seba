@@ -129,6 +129,9 @@ class Agenda(BaseModel):
     briefing: str
     review_items: list[ReviewItem]
     teach_concept: TeachConcept | None
+    # Follow-ons when the goal allows more than one concept a session. The tutor
+    # starts the next only once the current one reaches a stopping point.
+    next_concepts: list[TeachConcept] = Field(default_factory=list)
     practice_quota: int
     pace_hint: PaceHint
     session_type: SessionType = SessionType.ORDINARY

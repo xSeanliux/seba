@@ -3,6 +3,7 @@ from datetime import date
 from seba.models import (
     Concept,
     Emphasis,
+    GoalSettings,
     GoalState,
     GradeReview,
     Item,
@@ -314,3 +315,73 @@ def test_emphasis_lines(tmp_path):
         "emphasis:"
         not in build_agenda(trouble_state(), profile(), TODAY, tmp_path).briefing
     )
+
+
+def test_concepts_per_session_lists_up_to_that_many(tmp_path):
+    concepts = [
+        Concept(id="a", name="A", status="done"),
+        Concept(id="b", name="B"),
+        Concept(id="c", name="C", status="in-progress"),
+        Concept(id="d", name="D", prereqs=["b"]),  # not ready: b is not done
+        Concept(id="e", name="E"),
+    ]
+    two = build_agenda(
+        state(concepts, settings=GoalSettings(concepts_per_session=2)),
+        profile(),
+        TODAY,
+        tmp_path,
+    )
+    assert two.teach_concept.id == "c"  # in progress comes first
+    assert [c.id for c in two.next_concepts] == ["b"]
+    assert "next: b — start it only once" in two.briefing
+
+    five = build_agenda(
+        state(concepts, settings=GoalSettings(concepts_per_session=5)),
+        profile(),
+        TODAY,
+        tmp_path,
+    )
+    assert [c.id for c in five.next_concepts] == ["b", "e"]  # only what is ready
+
+
+def test_one_ready_concept_lists_one(tmp_path):
+    s = state(
+        [Concept(id="a", name="A")], settings=GoalSettings(concepts_per_session=2)
+    )
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert a.teach_concept.id == "a" and a.next_concepts == []
+    assert "next:" not in a.briefing
+
+
+def test_the_default_is_one_concept(tmp_path):
+    s = state([Concept(id="a", name="A"), Concept(id="b", name="B")])
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert a.teach_concept.id == "a" and a.next_concepts == []
+
+
+def test_no_follow_ons_outside_an_ordinary_session(tmp_path):
+    concepts = [
+        Concept(id="a", name="A", status="done"),
+        Concept(id="b", name="B", status="done"),
+        Concept(id="c", name="C"),
+        Concept(id="d", name="D"),
+    ]
+    s = state(concepts, session_number=5, settings=GoalSettings(concepts_per_session=2))
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert a.session_type == "synthesis"
+    assert a.teach_concept is None and a.next_concepts == []
+
+
+def test_follow_ons_share_the_excerpt_budget(tmp_path):
+    (tmp_path / "a.md").write_text("x" * 12_000)
+    (tmp_path / "b.md").write_text("y" * 12_000)
+    s = state(
+        [
+            Concept(id="a", name="A", sources=["a.md"]),
+            Concept(id="b", name="B", sources=["b.md"]),
+        ],
+        settings=GoalSettings(concepts_per_session=2),
+    )
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert len(a.teach_concept.source_excerpts[0]) == 12_000
+    assert len(a.next_concepts[0].source_excerpts[0]) == 4_000

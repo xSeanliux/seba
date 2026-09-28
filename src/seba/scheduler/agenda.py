@@ -154,6 +154,29 @@ def _emphasis_lines(state: GoalState) -> list[str]:
     ]
 
 
+def _teach(
+    state: GoalState, src: Concept, sources_dir: Path, budget: int
+) -> tuple[TeachConcept, int]:
+    excerpts = []
+    for ref in src.sources:
+        if budget <= 0:
+            break
+        ex = resolve_excerpt(sources_dir, ref, budget)
+        if ex:
+            excerpts.append(ex)
+            budget -= len(ex)
+    teach = TeachConcept(
+        id=src.id,
+        name=src.name,
+        kc_type=src.kc_type,
+        confusable_with=confusables(state.syllabus, src.id),
+        sources=src.sources,
+        source_excerpts=excerpts,
+        guidance=f"estimated {src.est_sessions} session(s)",
+    )
+    return teach, budget
+
+
 def build_agenda(
     state: GoalState, profile: SubjectProfile, today: date, sources_dir: Path
 ) -> Agenda:
@@ -162,11 +185,12 @@ def build_agenda(
     done = sum(c.status == "done" for c in concepts)
     session_type = _session_type(state, today, done)
 
-    teach_src = None
+    ready: list[Concept] = []
     if session_type == SessionType.ORDINARY:
-        teach_src = next(
-            (c for c in concepts if c.status == "in-progress"), None
-        ) or next(iter(frontier(state.syllabus)), None)
+        in_progress = [c for c in concepts if c.status == "in-progress"]
+        rest = [c for c in frontier(state.syllabus) if c.status != "in-progress"]
+        ready = (in_progress + rest)[: state.settings.concepts_per_session]
+    teach_src = ready[0] if ready else None
 
     picked = _reviews(state, teach_src, today, profile.max_reviews_per_session)
     reviews = [
@@ -174,28 +198,16 @@ def build_agenda(
     ]
 
     teach = None
+    following: list[TeachConcept] = []
     scope = {i.concept for i in picked}
     unmastered: list[str] = []
     soft_unmastered: list[str] = []
     if teach_src is not None:
-        excerpts, budget = [], EXCERPT_BUDGET
-        for ref in teach_src.sources:
-            ex = resolve_excerpt(sources_dir, ref, budget)
-            if ex:
-                excerpts.append(ex)
-                budget -= len(ex)
-                if budget <= 0:
-                    break
-        teach = TeachConcept(
-            id=teach_src.id,
-            name=teach_src.name,
-            kc_type=teach_src.kc_type,
-            confusable_with=confusables(state.syllabus, teach_src.id),
-            sources=teach_src.sources,
-            source_excerpts=excerpts,
-            guidance=f"estimated {teach_src.est_sessions} session(s)",
-        )
-        scope |= {teach_src.id, *teach_src.prereqs}
+        teach, budget = _teach(state, teach_src, sources_dir, EXCERPT_BUDGET)
+        for src in ready[1:]:
+            follow, budget = _teach(state, src, sources_dir, budget)
+            following.append(follow)
+        scope |= {teach_src.id, *teach_src.prereqs, *(c.id for c in ready[1:])}
         unmastered = [p for p in teach_src.prereqs if by_id[p].status != "done"]
         soft_unmastered = [
             p for p in teach_src.soft_prereqs if by_id[p].status != "done"
@@ -229,6 +241,12 @@ def build_agenda(
             f"soft prereqs not yet done (advisory): {', '.join(soft_unmastered)} — "
             "these don't gate the concept; touch them only if the learner stumbles."
         )
+    if following:
+        lines.append(
+            f"next: {', '.join(c.id for c in following)} — start it only once the "
+            "current concept reaches a stopping point; ending the session there "
+            "is always fine."
+        )
     lines += _stuck_lines(state)
     lines += _trouble_lines(state)
     lines += _emphasis_lines(state)
@@ -253,6 +271,7 @@ def build_agenda(
         briefing=briefing,
         review_items=reviews,
         teach_concept=teach,
+        next_concepts=following,
         practice_quota=PRACTICE_QUOTA[pace],
         pace_hint=pace,
         session_type=session_type,
