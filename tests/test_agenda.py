@@ -403,6 +403,10 @@ def test_concepts_per_session_lists_up_to_that_many(tmp_path):
         tmp_path,
     )
     assert [c.id for c in five.next_concepts] == ["b", "e"]  # only what is ready
+    assert (
+        "next: b, e — start each only once the one before it reaches a stopping "
+        "point; ending the session there is always fine." in five.briefing
+    )
 
 
 def test_one_ready_concept_lists_one(tmp_path):

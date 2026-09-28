@@ -250,10 +250,14 @@ def build_agenda(
             "these don't gate the concept; touch them only if the learner stumbles."
         )
     if following:
+        when = (
+            "start it only once the current concept"
+            if len(following) == 1
+            else "start each only once the one before it"
+        )
         lines.append(
-            f"next: {', '.join(c.id for c in following)} — start it only once the "
-            "current concept reaches a stopping point; ending the session there "
-            "is always fine."
+            f"next: {', '.join(c.id for c in following)} — {when} reaches a "
+            "stopping point; ending the session there is always fine."
         )
     lines += _stuck_lines(state)
     lines += _trouble_lines(state)
