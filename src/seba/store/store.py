@@ -60,6 +60,11 @@ class Store:
             ["git", *args], cwd=self.data_dir, check=True, capture_output=True
         )
 
+    def _commit(self, message: str, *paths: str) -> None:
+        """Commit only `paths`, whatever else is staged. Fails, as an empty
+        commit does, if none of them has a change."""
+        self._git("commit", "-m", message, "--", *paths)
+
     def _goal_dir(self, name: str) -> Path:
         return self.data_dir / "goals" / name
 
@@ -96,8 +101,9 @@ class Store:
         except SyllabusError as e:
             raise StoreError(f"{path.name}: {e}") from e
         self._write_syllabus(self._goal_dir(name), merged)
-        self._git("add", f"goals/{name}/syllabus.yaml")
-        self._git("commit", "-m", f"{name}: extended (+{len(new)})")
+        written = f"goals/{name}/syllabus.yaml"
+        self._git("add", written)
+        self._commit(f"{name}: extended (+{len(new)})", written)
         return [c.id for c in new]
 
     def _load_items(self, path: Path) -> list[Item]:
@@ -174,7 +180,7 @@ class Store:
             return False
         if staged.returncode != 1:
             raise StoreError(f"git diff failed: {staged.stderr.decode().strip()}")
-        self._git("commit", "-m", f"{name}: tuned")
+        self._commit(f"{name}: tuned", *paths)
         return True
 
     def _outcomes_files(self, name: str) -> list[Path]:

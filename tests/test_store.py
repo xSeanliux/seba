@@ -331,6 +331,38 @@ def test_save_tuning_leaves_other_staged_files_alone(store):
     assert _commits(store) == before
 
 
+def test_extend_and_tune_commit_only_their_own_files(store, tmp_path):
+    store.create_goal("prob", syl(), "probability")
+    (store.data_dir / "stray.txt").write_text("x")
+    subprocess.run(["git", "add", "stray.txt"], cwd=store.data_dir, check=True)
+
+    def last_commit():
+        return subprocess.run(
+            ["git", "show", "--name-only", "--format=", "HEAD"],
+            cwd=store.data_dir,
+            capture_output=True,
+            text=True,
+        ).stdout.split()
+
+    def staged():
+        return subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            cwd=store.data_dir,
+            capture_output=True,
+            text=True,
+        ).stdout.split()
+
+    more = tmp_path / "more.yaml"
+    more.write_text("- {id: odds, name: Odds}\n")
+    store.extend_syllabus("prob", more)
+    assert last_commit() == ["goals/prob/syllabus.yaml"]
+    assert staged() == ["stray.txt"]
+
+    assert store.save_tuning("prob", GoalSettings(desired_retention=0.85), {}, [])
+    assert last_commit() == ["goals/prob/goal.yaml"]
+    assert staged() == ["stray.txt"]
+
+
 def test_save_tuning_keeps_unknown_keys(store):
     store.create_goal("prob", syl(), "probability")
     path = _goal_yaml(store)
