@@ -131,14 +131,21 @@ class Store:
         settings: GoalSettings,
         emphasis: dict[str, Emphasis],
         items: list[Item],
+        *,
+        direction: str | None = None,
     ) -> bool:
-        """Write settings, emphasis and cards. Commits only if something changed:
-        `_git` runs with check=True and an empty commit fails."""
+        """Write settings, emphasis, cards and, unless it is None, the direction.
+        Commits only if something changed: `_git` runs with check=True and an
+        empty commit fails."""
         gdir = self._goal_dir(name)
         path = gdir / "goal.yaml"
-        meta = self._load_meta(path).model_copy(
-            update={"settings": settings, "emphasis": emphasis}
-        )
+        update: dict[str, GoalSettings | dict[str, Emphasis] | str] = {
+            "settings": settings,
+            "emphasis": emphasis,
+        }
+        if direction is not None:
+            update["direction"] = direction
+        meta = self._load_meta(path).model_copy(update=update)
         path.write_text(
             yaml.safe_dump(
                 meta.model_dump(mode="json", exclude_none=True), sort_keys=False

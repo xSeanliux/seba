@@ -21,6 +21,7 @@
   table { border-collapse: collapse; width: 100%; }
   th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e2e8f0; }
   th { color: #475569; font-weight: 600; }
+  tr.dropped td { color: #94a3b8; }
   #generated { color: #94a3b8; font-size: 12px; margin-top: 1.5rem; }
 </style>
 </head>
@@ -32,6 +33,7 @@
   <i style="background:#e2e8f0"></i>unseen
   <i style="background:#fde68a"></i>in-progress
   <i style="background:#86efac"></i>done
+  <i style="background:#f8fafc;border-style:dashed"></i>dropped
   <i style="background:#fff;border-color:#2563eb;border-width:2px"></i>frontier
 </p>
 <div id="graphwrap"><svg id="graph"></svg></div>
@@ -42,17 +44,20 @@
 <p id="generated"></p>
 <script>
 const DATA = __SEBA_DATA__;
-const COLORS = { "unseen": "#e2e8f0", "in-progress": "#fde68a", "done": "#86efac" };
+const COLORS = { "unseen": "#e2e8f0", "in-progress": "#fde68a", "done": "#86efac", "dropped": "#f8fafc" };
 
 document.title = `seba — ${DATA.goal}`;
 document.getElementById("title").textContent = `${DATA.goal} (${DATA.subject})`;
 const S = DATA.stats;
 document.getElementById("stats").textContent =
-  `session ${DATA.session_number} · concepts ${S.concepts_done}/${S.concepts_total} done · ` +
+  `session ${DATA.session_number} · concepts ${S.concepts_done} done, ${S.concepts_open} open` +
+  (S.concepts_dropped ? `, ${S.concepts_dropped} dropped` : "") + " · " +
   `cards ${S.cards_total} (${S.cards_due} due today) · frontier: ${S.frontier.join(", ") || "none"}`;
 
+// progress over what is still in play: a dropped concept is set aside, not owed
+const inPlay = S.concepts_done + S.concepts_open;
 document.querySelector("#bar i").style.width =
-  S.concepts_total ? `${(100 * S.concepts_done / S.concepts_total).toFixed(1)}%` : "0";
+  inPlay ? `${(100 * S.concepts_done / inPlay).toFixed(1)}%` : "0";
 
 // ---- layered dependency graph: layers flow DOWN, scaled to fit the page ----
 const svg = document.getElementById("graph");
@@ -109,16 +114,19 @@ for (const c of DATA.concepts)                     // edges first, under the nod
 for (const c of DATA.concepts) {
   const { x, y } = pos.get(c.id);
   const onFrontier = S.frontier.includes(c.id);
-  const g = el("g", { style: "cursor: default" });
+  const dropped = c.status === "dropped";          // set aside: faded, dashed edge
+  const g = el("g", { style: "cursor: default", opacity: dropped ? 0.6 : 1 });
   el("rect", { x, y, width: W, height: H, rx: 10, fill: COLORS[c.status] || "#e2e8f0",
                stroke: onFrontier ? "#2563eb" : "#94a3b8",
+               "stroke-dasharray": dropped ? "5 4" : "none",
                "stroke-width": onFrontier ? 2.5 : 1, filter: "url(#sh)" }, g);
   const check = c.status === "done" ? "✓ " : "";
   const t1 = el("text", { x: x + 12, y: y + 21, "font-size": 12.5, "font-weight": 600 }, g);
   t1.textContent = check + (c.name.length > 25 ? c.name.slice(0, 24) + "…" : c.name);
   const t2 = el("text", { x: x + 12, y: y + 39, "font-size": 11, fill: "#475569" }, g);
   t2.textContent = `${c.cards} card${c.cards === 1 ? "" : "s"}` +
-    (c.due ? ` · ${c.due} due` : "") + ` · ~${c.est_sessions} session${c.est_sessions === 1 ? "" : "s"}`;
+    (c.due ? ` · ${c.due} due` : "") +
+    (dropped ? " · dropped" : ` · ~${c.est_sessions} session${c.est_sessions === 1 ? "" : "s"}`);
   const paint = (stroke, width) => () => {
     for (const pth of edgesByNode.get(c.id) || []) {
       pth.setAttribute("stroke", stroke);
@@ -133,6 +141,7 @@ for (const c of DATA.concepts) {
 const tbody = document.querySelector("#cards tbody");
 for (const c of DATA.concepts) {
   const tr = document.createElement("tr");
+  if (c.status === "dropped") tr.className = "dropped";
   for (const v of [c.name, c.status, c.est_sessions, c.cards, c.due]) {
     const td = document.createElement("td");
     td.textContent = v;

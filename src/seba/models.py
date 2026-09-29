@@ -274,6 +274,8 @@ class ViewConcept(BaseModel):
 class ViewStats(BaseModel):
     concepts_done: int
     concepts_total: int
+    concepts_open: int = 0  # unseen or in progress
+    concepts_dropped: int = 0
     cards_total: int
     cards_due: int
     frontier: list[str]

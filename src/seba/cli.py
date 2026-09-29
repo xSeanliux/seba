@@ -354,6 +354,9 @@ def tune(
     completion_passes: int | None = typer.Option(None, "--completion-passes"),
     concept: str | None = typer.Option(None, "--concept"),
     emphasis: str | None = typer.Option(None, "--emphasis", help="less|normal|more"),
+    direction: str | None = typer.Option(
+        None, "--direction", help="what the goal is for, as the learner now puts it"
+    ),
 ):
     store = _store()
     state = _load_goal(store, goal)
@@ -364,17 +367,23 @@ def tune(
         "completion_passes": completion_passes,
     }
     changes = {k: v for k, v in asked.items() if v is not None}
-    if not changes and concept is None and emphasis is None:
+    if not changes and concept is None and emphasis is None and direction is None:
         typer.echo(
             yaml.safe_dump(
                 {
+                    "direction": state.direction,
                     "settings": state.settings.model_dump(mode="json"),
                     "emphasis": {c: str(e) for c, e in state.emphasis.items()},
                 },
                 sort_keys=False,
+                allow_unicode=True,
             )
         )
         return
+    if direction is not None:
+        direction = direction.strip()
+        if not direction:
+            raise _refuse("--direction needs text")
 
     try:
         settings = GoalSettings.model_validate(
@@ -414,10 +423,16 @@ def tune(
             line += f" ({len(mine)} card{'' if len(mine) == 1 else 's'} due now)"
         if was != emphasis or emphasis == "more":
             said.append(line)
+    if direction == state.direction:
+        direction = None  # already what the goal is for; leave goal.yaml alone
+    if direction is not None:
+        said.append(f'direction: "{state.direction}" → "{direction}"')
 
     # Nothing to say means nothing to write; and save_tuning itself declines to
     # commit when the files come out identical (emphasis `more` set twice).
-    if not said or not store.save_tuning(goal, settings, levels, items):
+    if not said or not store.save_tuning(
+        goal, settings, levels, items, direction=direction
+    ):
         typer.echo("nothing changed")
         return
     typer.echo("\n".join(said))
