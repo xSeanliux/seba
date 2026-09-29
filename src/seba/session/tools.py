@@ -14,7 +14,7 @@ from seba.models import (
     UpdateConcept,
 )
 from seba.scheduler.apply import apply_change, replay
-from seba.syllabus.graph import SyllabusError
+from seba.syllabus.graph import SyllabusError, check_teachable
 
 
 def mint_budget(max_reviews_per_session: int) -> int:
@@ -148,6 +148,13 @@ class ToolHandler:
                 f"'{call.id}' is done; reopening it is the learner's decision — "
                 "if they agree, use --status reopened"
             ), True
+        if call.status_change == "started" and status == Status.UNSEEN:
+            # Hard edges are the curriculum, as for `seba start --concept`. A
+            # `started` on a concept in progress is a repeat, not checked.
+            try:
+                check_teachable(syllabus, call.id)
+            except SyllabusError as e:
+                return str(e), True
         note = ""
         if call.status_change == "completed" and not (call.evidence or "").strip():
             # Naming the exchange moves the call from mastery attribution (which
