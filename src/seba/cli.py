@@ -386,7 +386,8 @@ def tune(
         )
         return
     if direction is not None:
-        direction = direction.strip()
+        # One line: a newline would put a line of its own into the briefing.
+        direction = " ".join(direction.split())
         if not direction:
             raise _refuse("--direction needs text")
 
@@ -428,7 +429,9 @@ def tune(
             line += f" ({len(mine)} card{'' if len(mine) == 1 else 's'} due now)"
         if was != emphasis or emphasis == "more":
             said.append(line)
-    if direction == state.direction:
+    # Against what goal.yaml holds, not the loaded direction: that falls back
+    # to the syllabus's goal line, and a stated direction is still recorded.
+    if direction == store.stored_direction(goal):
         direction = None  # already what the goal is for; leave goal.yaml alone
     if direction is not None:
         said.append(f'direction: "{state.direction}" → "{direction}"')

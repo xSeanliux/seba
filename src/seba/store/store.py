@@ -117,6 +117,10 @@ class Store:
         except (yaml.YAMLError, ValidationError) as e:
             raise StoreError(f"{path.name}: {e}") from e
 
+    def stored_direction(self, name: str) -> str | None:
+        """The direction as goal.yaml holds it, with no fallback."""
+        return self._load_meta(self._goal_dir(name) / "goal.yaml").direction
+
     def _write_items(self, gdir: Path, items: list[Item]) -> None:
         tmp = gdir / "items.jsonl.tmp"
         tmp.write_text(
