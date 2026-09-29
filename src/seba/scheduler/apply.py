@@ -2,7 +2,14 @@ from datetime import datetime
 
 from seba.models import GoalState, SessionRecord, Status, Syllabus, UpdateConcept
 from seba.scheduler.items import apply_review, mint_item
-from seba.syllabus.graph import SyllabusError, apply_status, drop, restore
+from seba.syllabus.graph import (
+    SyllabusError,
+    _find,
+    _replace,
+    apply_status,
+    drop,
+    restore,
+)
 
 _STATUS: dict[str, Status] = {
     "started": Status.IN_PROGRESS,
@@ -18,24 +25,19 @@ def apply_change(syllabus: Syllabus, change: UpdateConcept) -> Syllabus:
     elif change.status_change == "restored":
         syllabus = restore(syllabus, change.id)
     elif change.status_change is not None:
-        syllabus = apply_status(
-            syllabus,
-            change.id,
-            _STATUS[change.status_change],
-            reopen=change.status_change == "reopened",
-        )
+        status = _STATUS[change.status_change]
+        reopen = change.status_change == "reopened"
+        # Re-reporting the status a concept already has (a repeated `started`
+        # above all) is normal: no move, and a source it carries still goes in.
+        if reopen or _find(syllabus, change.id).status != status:
+            syllabus = apply_status(syllabus, change.id, status, reopen=reopen)
     if change.add_source:
-        src = change.add_source
-        syllabus = syllabus.model_copy(
-            update={
-                "concepts": [
-                    c.model_copy(update={"sources": [*c.sources, src]})
-                    if c.id == change.id and src not in c.sources
-                    else c
-                    for c in syllabus.concepts
-                ]
-            }
-        )
+        c = _find(syllabus, change.id)
+        if change.add_source not in c.sources:
+            syllabus = _replace(
+                syllabus,
+                c.model_copy(update={"sources": [*c.sources, change.add_source]}),
+            )
     return syllabus
 
 

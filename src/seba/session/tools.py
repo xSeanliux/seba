@@ -168,20 +168,7 @@ class ToolHandler:
         try:
             apply_change(syllabus, call)
         except SyllabusError as e:
-            # Re-reporting the status a concept already has is normal (a
-            # repeated `started` above all) and harmless: `seba end` skips it.
-            repeat = (call.status_change, status) in (
-                ("started", Status.IN_PROGRESS),
-                ("completed", Status.DONE),
-            )
-            if not repeat:
-                return str(e), True
-            if call.add_source:
-                # `seba end` skips the repeated status, and the source with
-                # it, so the source goes in on its own too.
-                self.record.concepts.append(
-                    UpdateConcept(id=call.id, add_source=call.add_source)
-                )
+            return str(e), True
         self.record.concepts.append(call)
         return "recorded" + note, False
 

@@ -136,6 +136,19 @@ def test_apply_change_adds_a_source_once_with_or_without_a_status():
     assert s.concepts[0].sources == ["p.md", "q.md", "r.md"]
 
 
+def test_a_repeated_status_is_no_move_and_still_adds_its_source():
+    for status, move in ((Status.IN_PROGRESS, "started"), (Status.DONE, "completed")):
+        s = syl(Concept(id="x", name="X", status=status))
+        s = apply_change(
+            s, UpdateConcept(id="x", status_change=move, add_source="p.md")
+        )
+        assert s.concepts[0].status == status
+        assert s.concepts[0].sources == ["p.md"]
+    s = syl(Concept(id="x", name="X", status=Status.IN_PROGRESS))
+    with pytest.raises(SyllabusError, match="in-progress -> in-progress"):
+        apply_change(s, UpdateConcept(id="x", status_change="reopened"))
+
+
 # handler
 
 
@@ -198,6 +211,10 @@ def test_a_source_with_a_repeated_status_is_kept(tmp_path):
         False,
     )
     assert next(c for c in h.effective().concepts if c.id == "b").sources == ["p.md"]
+    assert [(c.status_change, c.add_source) for c in h.record.concepts] == [
+        ("started", None),
+        ("started", "p.md"),
+    ]
 
 
 def test_handler_refuses_minting_for_a_concept_dropped_this_session(tmp_path):
