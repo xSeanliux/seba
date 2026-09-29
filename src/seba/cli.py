@@ -304,7 +304,11 @@ def abandon(
     store, pending, handler, ppath = _session(goal)
     if discard:
         clear_pending(ppath)
-        typer.echo("pending session discarded")
+        r = pending.record
+        typer.echo(
+            f"pending session discarded ({len(r.reviews)} grades, "
+            f"{len(r.new_items)} minted, {len(r.concepts)} concept calls)"
+        )
         return
     _finish(store, goal, pending, ppath)  # complete=False → INCOMPLETE marker
 

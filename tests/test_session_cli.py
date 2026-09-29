@@ -234,6 +234,24 @@ def test_abandon_discard(monkeypatch, tmp_path):
     assert not (data / "goals" / "prob" / "sessions" / "002.md").exists()
 
 
+def test_abandon_discard_says_what_it_discarded(monkeypatch, tmp_path):
+    seed(env(monkeypatch, tmp_path))
+    runner.invoke(app, ["start", "prob"])
+    runner.invoke(app, ["grade", "prob", "it-1", "good"])
+    runner.invoke(
+        app,
+        ["mint", "prob", "--concept", "bayes", "--type", "recall"]
+        + ["--front", "f", "--back", "b"],
+    )
+    runner.invoke(app, ["concept", "prob", "bayes", "--status", "started"])
+    runner.invoke(app, ["concept", "prob", "bayes", "--note", "n"])
+    result = runner.invoke(app, ["abandon", "prob", "--discard"])
+    assert result.exit_code == 0
+    assert result.output.strip() == (
+        "pending session discarded (1 grades, 1 minted, 2 concept calls)"
+    )
+
+
 def test_abandon_saves_incomplete(monkeypatch, tmp_path):
     data = env(monkeypatch, tmp_path)
     seed(data)
