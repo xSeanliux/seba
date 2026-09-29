@@ -16,7 +16,7 @@ record does not exist next session.
 | Command | Purpose |
 |---|---|
 | `seba status` | list goals with due counts |
-| `seba start GOAL [--concept ID]` | begin/resume a session; prints YAML: `agenda`, `subject_style`, `already_graded`, `ungraded_reviews`, `minted_so_far`. `--concept` steers a new session to that concept; refused once a session is pending (see Changing a syllabus) |
+| `seba start GOAL [--concept ID]` | begin/resume a session; prints YAML: `agenda`, `subject_style`, `already_graded`, `ungraded_reviews`, `minted_so_far`, `concept_calls_so_far`. `--concept` steers a new session to that concept; refused once a session is pending (see Changing a syllabus) |
 | `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record a review grade the moment its exchange resolves; `--note` is **required** on `hard` and `again` |
 | `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create a spaced-repetition card (small per-session budget, set by the subject's review capacity — it tells you the number when you hit it) |
 | `seba concept GOAL ID [--status started\|completed\|reopened\|dropped\|restored] [--evidence TEXT] [--note TEXT] [--add-source LOCATOR]` | record concept progress or a misconception/strength note; `completed` **requires** `--evidence` naming the exchange that showed mastery, and is refused on a concept still `unseen`; `started` on an `unseen` concept is refused until its hard prerequisites are done; `reopened` is only for a done concept, and only once the learner has agreed. `dropped`, `restored` and `--add-source` change the syllabus from the next session (see Changing a syllabus) |
@@ -144,8 +144,9 @@ unless it has no cards, it can't be completed in the session that reopened it.
 ## Session flow
 
 1. `seba status`; if the user named a goal, `seba start GOAL` directly. If they
-   also asked for a particular concept today, or last session's hint asks for
-   one, steer (see Steering, under Changing a syllabus).
+   also asked for a particular concept today, or last session's hint carries
+   the learner's request for one, steer (see Steering, under Changing a
+   syllabus).
 2. Parse the YAML. `agenda.briefing` is your memory of this learner — open with
    one natural sentence of continuity from it, picking up last session's hint.
    `subject_style` governs notation and drill style for the whole session, and
@@ -466,10 +467,10 @@ conversation:
    that first`: ask about P, as for a restore); read the message, fix, retry.
    This session's agenda is unchanged; the new concepts reach the
    frontier once their hard prerequisites are done. If the learner wants one
-   now, then once the current concept reaches a stopping point,
-   `seba concept GOAL ID --status started` it, teach it and mint its first
-   card, as for a follow-on. `started` is refused, naming what stands in the
-   way, for a concept that isn't ready. An existing concept the source also
+   now, on an ordinary day, then once the current concept reaches a stopping
+   point, `seba concept GOAL ID --status started` it, teach it and mint its
+   first card, as for a follow-on. `started` is refused, naming what stands in
+   the way, for a concept that isn't ready. An existing concept the source also
    teaches: `seba concept GOAL ID --add-source LOCATOR`, one slice per call.
 
 **A gap under an existing concept.** Background an existing concept needs and
@@ -501,31 +502,31 @@ setting it aside, usually because the direction moved.
 **Steering.** When the learner asks for a particular concept, start the session
 on it: `seba start GOAL --concept ID` (ids from `seba view GOAL --json`). It
 must be in progress or on the frontier. A refused `--concept` starts no
-session; `seba start GOAL` starts the usual one. Refusals:
+session: run `seba start GOAL` for the usual one, and tell the learner what
+stood in the way. Refusals:
 - `'X' is not ready: a, b must be done first` — hard prerequisites are the
-  curriculum. Tell the learner what stands in the way. Offer the first of
-  those that is ready (in progress, or in `stats.frontier` of
-  `seba view GOAL --json`), or ask what they want instead.
+  curriculum. Offer the first of those that is ready (in progress, or in
+  `stats.frontier` of `seba view GOAL --json`), or ask what they want instead.
 - `'X' is dropped; restore it first` or `'X' is done; reopen it if the learner
   wants it taught again` — restoring or reopening is its own decision, made in
   a session, and shows from the next.
 - `a session is already in progress for 'GOAL' — end or abandon it before
   choosing a concept` — steering happens before a session starts. Asked
   after `seba start`:
-  - **Nothing recorded yet** — `seba start` showed `already_graded` empty and
-    `minted_so_far: 0`, and you have run no `seba grade`, `seba mint` or
-    `seba concept` since: `seba abandon GOAL --discard`, then
-    `seba start GOAL --concept ID`. Nothing is lost.
-  - **Something recorded** — never discard: it throws away every grade, card
-    and concept call of this session. Teach what the agenda holds. Put the
-    request in the `--hint` at `seba end`, naming the concept by its id
-    ("learner asked for bayes-rule — steer to it"), and tell the learner they
-    can also name it when they next start.
+  - **Nothing recorded** — only when all of these hold: `seba start` did not
+    print `(resuming session in progress)`; `already_graded` is empty;
+    `minted_so_far` and `concept_calls_so_far` are both 0; and you have run no
+    `seba grade`, `seba mint` or `seba concept` since. Then a discard loses
+    nothing: `seba abandon GOAL --discard`, then `seba start GOAL --concept ID`.
+  - **Otherwise** — never discard: it throws away the recorded grades, cards
+    and concept calls, a resumed session's too. Teach what the agenda holds.
+    Put the request in the `--hint` at `seba end` by id ("learner asked for
+    bayes-rule — steer to it"); tell the learner they can name it next start.
 
-**A hint that asks for a concept.** At the open, `Last session's hint:` may
-carry a request like that. Unless `teach_concept` is already that concept,
-discard and start again steered, as above: you have just run `seba start` and
-recorded nothing.
+**A hint carrying the learner's request for a concept.** If nothing is
+recorded (the test above) and `teach_concept` is not already that concept,
+discard and start again steered; otherwise don't. If that `--concept` is
+refused, the plain `seba start GOAL` you run next is the session; keep it.
 
 A steered session is ordinary, even on a day that would have been synthesis or
 return-after-lapse; on the latter the briefing carries an `away:` line.
