@@ -1,6 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
 
-import pytest
 from fsrs import Card
 
 from seba.models import (
@@ -16,7 +15,6 @@ from seba.models import (
     UpdateConcept,
 )
 from seba.scheduler.apply import apply_change, apply_record, replay
-from seba.syllabus.graph import SyllabusError
 
 NOW = datetime(2026, 7, 3, tzinfo=timezone.utc)
 
@@ -174,10 +172,3 @@ def test_replay_skips_an_illegal_move_and_applies_the_rest():
 def test_apply_change_without_a_move_returns_the_syllabus():
     s = _syl()
     assert apply_change(s, UpdateConcept(id="bayes", note="n")) is s
-
-
-@pytest.mark.parametrize("change", ["dropped", "restored"])
-def test_dropped_and_restored_move_nothing_yet(change):
-    with pytest.raises(SyllabusError):
-        apply_change(_syl(), UpdateConcept(id="bayes", status_change=change))
-    assert replay(_syl(), [UpdateConcept(id="bayes", status_change=change)]) == _syl()

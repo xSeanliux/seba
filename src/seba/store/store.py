@@ -273,10 +273,13 @@ class Store:
             if not gdir.is_dir():
                 continue
             gs = self.load_goal(gdir.name)
+            dropped = {c.id for c in gs.syllabus.concepts if c.status == "dropped"}
             due = sum(
                 1
                 for i in gs.items
-                if not i.suspended and str(i.fsrs.get("due", ""))[:10] <= today
+                if not i.suspended
+                and i.concept not in dropped
+                and str(i.fsrs.get("due", ""))[:10] <= today
             )
             out.append(
                 GoalSummary(

@@ -93,3 +93,56 @@ def apply_status(
     if not found:
         raise SyllabusError(f"unknown concept: '{concept_id}'")
     return s.model_copy(update={"concepts": concepts})
+
+
+def _find(s: Syllabus, concept_id: str) -> Concept:
+    for c in s.concepts:
+        if c.id == concept_id:
+            return c
+    raise SyllabusError(f"unknown concept: '{concept_id}'")
+
+
+def _replace(s: Syllabus, new: Concept) -> Syllabus:
+    return s.model_copy(
+        update={"concepts": [new if c.id == new.id else c for c in s.concepts]}
+    )
+
+
+def drop(s: Syllabus, concept_id: str) -> Syllabus:
+    """Set a concept aside, remembering the status it had. Only hard prereq
+    edges block: they are the curriculum, and a live concept cannot stand on
+    one that is gone."""
+    c = _find(s, concept_id)
+    if c.status == "dropped":
+        raise SyllabusError(f"'{concept_id}' is already dropped")
+    live = [
+        d.id for d in s.concepts if concept_id in d.prereqs and d.status != "dropped"
+    ]
+    if live:
+        raise SyllabusError(
+            f"cannot drop '{concept_id}': {', '.join(live)} depend on it — drop "
+            "them first, or remove the edge in syllabus.yaml"
+        )
+    return _replace(
+        s, c.model_copy(update={"status": Status.DROPPED, "dropped_from": c.status})
+    )
+
+
+def restore(s: Syllabus, concept_id: str) -> Syllabus:
+    c = _find(s, concept_id)
+    if c.status != "dropped":
+        raise SyllabusError(
+            f"'{concept_id}' is {c.status}; only a dropped concept can be restored"
+        )
+    gone = [p for p in c.prereqs if _find(s, p).status == "dropped"]
+    if gone:
+        raise SyllabusError(
+            f"cannot restore '{concept_id}': it depends on {', '.join(gone)}, "
+            "which is dropped — restore that first"
+        )
+    return _replace(
+        s,
+        c.model_copy(
+            update={"status": c.dropped_from or Status.UNSEEN, "dropped_from": None}
+        ),
+    )

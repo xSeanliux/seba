@@ -2,7 +2,7 @@ from datetime import datetime
 
 from seba.models import GoalState, SessionRecord, Status, Syllabus, UpdateConcept
 from seba.scheduler.items import apply_review, mint_item
-from seba.syllabus.graph import SyllabusError, apply_status
+from seba.syllabus.graph import SyllabusError, apply_status, drop, restore
 
 _STATUS: dict[str, Status] = {
     "started": Status.IN_PROGRESS,
@@ -13,17 +13,30 @@ _STATUS: dict[str, Status] = {
 
 def apply_change(syllabus: Syllabus, change: UpdateConcept) -> Syllabus:
     """Apply one concept change. Raises SyllabusError if the move is illegal."""
-    if change.status_change is None:
-        return syllabus
-    # Placeholder: drop and restore are not built yet.
-    if change.status_change in ("dropped", "restored"):
-        raise SyllabusError(f"'{change.status_change}' is not supported yet")
-    return apply_status(
-        syllabus,
-        change.id,
-        _STATUS[change.status_change],
-        reopen=change.status_change == "reopened",
-    )
+    if change.status_change == "dropped":
+        syllabus = drop(syllabus, change.id)
+    elif change.status_change == "restored":
+        syllabus = restore(syllabus, change.id)
+    elif change.status_change is not None:
+        syllabus = apply_status(
+            syllabus,
+            change.id,
+            _STATUS[change.status_change],
+            reopen=change.status_change == "reopened",
+        )
+    if change.add_source:
+        src = change.add_source
+        syllabus = syllabus.model_copy(
+            update={
+                "concepts": [
+                    c.model_copy(update={"sources": [*c.sources, src]})
+                    if c.id == change.id and src not in c.sources
+                    else c
+                    for c in syllabus.concepts
+                ]
+            }
+        )
+    return syllabus
 
 
 def replay(syllabus: Syllabus, changes: list[UpdateConcept]) -> Syllabus:
