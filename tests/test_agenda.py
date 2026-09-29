@@ -378,6 +378,18 @@ def test_emphasis_lines(tmp_path):
     )
 
 
+def test_no_emphasis_line_for_a_dropped_concept(tmp_path):
+    s = state(
+        [
+            Concept(id="a", name="A", status="dropped", dropped_from="done"),
+            Concept(id="b", name="B"),
+        ],
+        emphasis={"a": Emphasis.MORE, "b": Emphasis.LESS},
+    )
+    briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert "emphasis: [a]" not in briefing and "emphasis: [b] less" in briefing
+
+
 def test_concepts_per_session_lists_up_to_that_many(tmp_path):
     concepts = [
         Concept(id="a", name="A", status="done"),

@@ -119,6 +119,35 @@ def test_the_briefing_says_steered(tmp_path):
     assert "steered:" not in build_agenda(s, profile(), TODAY, tmp_path).briefing
 
 
+AWAY = (
+    "away: 32 days since the last session — acknowledge it briefly and without "
+    "guilt, then teach what the learner asked for."
+)
+
+
+def test_a_steered_lapse_day_still_says_how_long_the_learner_was_away(tmp_path):
+    s = state(concepts(), last_session_date=date(2026, 6, 1))
+    lines = build_agenda(s, profile(), TODAY, tmp_path, teach="b").briefing.split("\n")
+    steered = lines.index("steered: the learner asked for [b] today.")
+    assert lines[steered + 1] == AWAY
+
+
+def test_no_away_line_on_an_ordinary_or_unsteered_day(tmp_path):
+    ordinary = state(concepts(), last_session_date=date(2026, 7, 1))
+    assert (
+        "away:"
+        not in build_agenda(ordinary, profile(), TODAY, tmp_path, teach="b").briefing
+    )
+    lapse = state(concepts(), last_session_date=date(2026, 6, 1))
+    briefing = build_agenda(lapse, profile(), TODAY, tmp_path).briefing
+    assert "away:" not in briefing
+    assert (
+        "Session type: return-after-lapse — 32 days since the last session. "
+        "Triage the backlog and teach no new concept; re-orient briefly, and "
+        "frame the gap without guilt."
+    ) in briefing.split("\n")
+
+
 def test_build_agenda_lets_the_refusal_through(tmp_path):
     with pytest.raises(SyllabusError, match="'d' is not ready"):
         build_agenda(state(concepts()), profile(), TODAY, tmp_path, teach="d")

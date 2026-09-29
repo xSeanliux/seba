@@ -158,10 +158,13 @@ def _trouble_lines(state: GoalState) -> list[str]:
 
 def _emphasis_lines(state: GoalState) -> list[str]:
     often = {Emphasis.MORE: "more", Emphasis.LESS: "less"}
+    # A dropped concept's cards are not reviewed, so there is nothing to expect.
+    dropped = {c.id for c in state.syllabus.concepts if c.status == "dropped"}
     return [
         f"emphasis: [{cid}] {e} — the learner asked to see these cards "
         f"{often[e]} often."
         for cid, e in sorted(state.emphasis.items())
+        if cid not in dropped
     ]
 
 
@@ -200,6 +203,8 @@ def build_agenda(
     by_id = {c.id: c for c in concepts}
     done = sum(c.status == "done" for c in concepts)
     session_type = _session_type(state, today, done)
+    lapsed = session_type == SessionType.RETURN_AFTER_LAPSE
+    gap = (today - state.last_session_date).days if state.last_session_date else 0
     # The learner asked for a concept: that outranks a synthesis or
     # return-after-lapse day.
     steered = check_teachable(state.syllabus, teach) if teach is not None else None
@@ -218,7 +223,8 @@ def build_agenda(
 
     picked = _reviews(state, teach_src, today, profile.max_reviews_per_session)
     reviews = [
-        ReviewItem(id=i.id, type=i.type, front=i.front, back=i.back) for i in picked
+        ReviewItem(id=i.id, type=i.type, front=i.front, back=i.back, concept=i.concept)
+        for i in picked
     ]
 
     taught = None
@@ -248,7 +254,6 @@ def build_agenda(
         f"Frontier: {front or 'none'}.",
     ]
     if session_type == SessionType.RETURN_AFTER_LAPSE:
-        gap = (today - state.last_session_date).days if state.last_session_date else 0
         lines.append(
             f"Session type: return-after-lapse — {gap} days since the last session. "
             "Triage the backlog and teach no new concept; re-orient briefly, and "
@@ -262,6 +267,11 @@ def build_agenda(
         )
     if steered is not None:
         lines.append(f"steered: the learner asked for [{steered.id}] today.")
+        if lapsed:
+            lines.append(
+                f"away: {gap} days since the last session — acknowledge it "
+                "briefly and without guilt, then teach what the learner asked for."
+            )
     if unmastered:
         lines.append(
             f"prereqs not yet done: {', '.join(unmastered)} — offer a short review "

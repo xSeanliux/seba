@@ -13,6 +13,7 @@ from seba.models import (
     GoalState,
     GradeReview,
     Item,
+    ReviewItem,
     SessionRecord,
     Status,
     SubjectProfile,
@@ -136,6 +137,19 @@ def test_apply_change_adds_a_source_once_with_or_without_a_status():
     assert s.concepts[0].sources == ["p.md", "q.md", "r.md"]
 
 
+def test_a_repeated_status_is_no_move_and_still_adds_its_source():
+    for status, move in ((Status.IN_PROGRESS, "started"), (Status.DONE, "completed")):
+        s = syl(Concept(id="x", name="X", status=status))
+        s = apply_change(
+            s, UpdateConcept(id="x", status_change=move, add_source="p.md")
+        )
+        assert s.concepts[0].status == status
+        assert s.concepts[0].sources == ["p.md"]
+    s = syl(Concept(id="x", name="X", status=Status.IN_PROGRESS))
+    with pytest.raises(SyllabusError, match="in-progress -> in-progress"):
+        apply_change(s, UpdateConcept(id="x", status_change="reopened"))
+
+
 # handler
 
 
@@ -198,6 +212,10 @@ def test_a_source_with_a_repeated_status_is_kept(tmp_path):
         False,
     )
     assert next(c for c in h.effective().concepts if c.id == "b").sources == ["p.md"]
+    assert [(c.status_change, c.add_source) for c in h.record.concepts] == [
+        ("started", None),
+        ("started", "p.md"),
+    ]
 
 
 def test_handler_refuses_minting_for_a_concept_dropped_this_session(tmp_path):
@@ -207,6 +225,45 @@ def test_handler_refuses_minting_for_a_concept_dropped_this_session(tmp_path):
         "mint_item", {"concept": "b", "type": "recall", "front": "f", "back": "b"}
     )
     assert err and text == "'b' is dropped; restore it before minting a card for it"
+
+
+def carded_handler(tmp_path: Path) -> ToolHandler:
+    h = handler(chain(), tmp_path)
+    h.agenda.review_items = [
+        ReviewItem(id="it-b", type="recall", front="f", back="b", concept="b"),
+        ReviewItem(id="it-a", type="recall", front="f", back="b"),  # no concept
+    ]
+    return h
+
+
+def test_a_card_of_a_concept_dropped_this_session_is_graded_skipped(tmp_path):
+    h = carded_handler(tmp_path)
+    update(h, status_change="dropped")
+    for grade in ("good", "easy", "hard", "again"):
+        text, err = h.handle(
+            "grade_review", {"id": "it-b", "grade": grade, "note": "n"}
+        )
+        assert (
+            err and text == "'it-b' belongs to 'b', which is dropped — grade it skipped"
+        )
+    assert h.record.reviews == []
+    assert h.handle("grade_review", {"id": "it-b", "grade": "skipped"}) == (
+        "recorded",
+        False,
+    )
+    # a card with no concept recorded is not checked
+    assert h.handle("grade_review", {"id": "it-a", "grade": "good"}) == (
+        "recorded",
+        False,
+    )
+
+
+def test_a_card_graded_before_its_concept_was_dropped_stays_graded(tmp_path):
+    h = carded_handler(tmp_path)
+    h.handle("grade_review", {"id": "it-b", "grade": "good"})
+    update(h, status_change="dropped")
+    assert [(r.id, r.grade) for r in h.record.reviews] == [("it-b", "good")]
+    assert h.missing_grades() == ["it-a"]
 
 
 # agenda and store
@@ -256,7 +313,10 @@ def test_a_dropped_concept_is_neither_reviewed_nor_taught(tmp_path):
     assert "slipped:" not in agenda.briefing
 
     agenda = build_agenda(goal_state(restore(s, "b")), profile(), TODAY, tmp_path)
-    assert {r.id for r in agenda.review_items} == {"it-a", "it-b"}
+    assert {(r.id, r.concept) for r in agenda.review_items} == {
+        ("it-a", "a"),
+        ("it-b", "b"),
+    }
     assert agenda.teach_concept is not None and agenda.teach_concept.id == "b"
     assert "slipped: [b] it-b" in agenda.briefing
 
@@ -342,6 +402,23 @@ def test_drop_and_restore_across_sessions(monkeypatch, tmp_path):
     assert [r["id"] for r in a["review_items"]] == ["it-1"]
     assert a["teach_concept"]["id"] == "bayes"
     assert store.load_goal("prob").items[0].fsrs["due"] == due_before
+
+
+def test_a_pending_session_from_before_review_concepts_loads_and_grades(
+    monkeypatch, tmp_path
+):
+    data = tmp_path / "data"
+    monkeypatch.setenv("SEBA_DATA_DIR", str(data))
+    seed(data)
+    agenda()
+    pending = data / "goals" / "prob" / "session.pending.yaml"
+    raw = yaml.safe_load(pending.read_text())
+    for r in raw["agenda"]["review_items"]:
+        del r["concept"]
+    pending.write_text(yaml.safe_dump(raw))
+    ok("concept", "prob", "bayes", "--status", "dropped")
+    ok("grade", "prob", "it-1", "good")
+    end()
 
 
 def test_add_source_reaches_syllabus_and_agenda(monkeypatch, tmp_path):

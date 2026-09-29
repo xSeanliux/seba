@@ -14,7 +14,7 @@ from seba.models import (
     UpdateConcept,
 )
 from seba.scheduler.apply import apply_change, replay
-from seba.syllabus.graph import SyllabusError
+from seba.syllabus.graph import SyllabusError, check_teachable
 
 
 def mint_budget(max_reviews_per_session: int) -> int:
@@ -77,10 +77,21 @@ class ToolHandler:
         return getattr(self, f"_{name}")(call)
 
     def _grade_review(self, call: GradeReview) -> tuple[str, bool]:
-        if call.id not in {r.id for r in self.agenda.review_items}:
+        item = next((r for r in self.agenda.review_items if r.id == call.id), None)
+        if item is None:
             return f"'{call.id}' is not in this session's review items", True
         if call.id in {r.id for r in self.record.reviews}:
             return f"'{call.id}' already graded", True
+        # The review list was fixed at start; a concept dropped since must not
+        # have its cards rescheduled or counted as passes.
+        if call.grade != Grade.SKIPPED and any(
+            c.id == item.concept and c.status == Status.DROPPED
+            for c in self.effective().concepts
+        ):
+            return (
+                f"'{call.id}' belongs to '{item.concept}', which is dropped — "
+                "grade it skipped"
+            ), True
         if call.grade in (Grade.AGAIN, Grade.HARD) and not (call.note or "").strip():
             # Enforced here, not on GradeReview: the model also parses old
             # session outcomes, which have no notes.
@@ -137,6 +148,13 @@ class ToolHandler:
                 f"'{call.id}' is done; reopening it is the learner's decision — "
                 "if they agree, use --status reopened"
             ), True
+        if call.status_change == "started" and status == Status.UNSEEN:
+            # Hard edges are the curriculum, as for `seba start --concept`. A
+            # `started` on a concept in progress is a repeat, not checked.
+            try:
+                check_teachable(syllabus, call.id)
+            except SyllabusError as e:
+                return str(e), True
         note = ""
         if call.status_change == "completed" and not (call.evidence or "").strip():
             # Naming the exchange moves the call from mastery attribution (which
@@ -168,20 +186,7 @@ class ToolHandler:
         try:
             apply_change(syllabus, call)
         except SyllabusError as e:
-            # Re-reporting the status a concept already has is normal (a
-            # repeated `started` above all) and harmless: `seba end` skips it.
-            repeat = (call.status_change, status) in (
-                ("started", Status.IN_PROGRESS),
-                ("completed", Status.DONE),
-            )
-            if not repeat:
-                return str(e), True
-            if call.add_source:
-                # `seba end` skips the repeated status, and the source with
-                # it, so the source goes in on its own too.
-                self.record.concepts.append(
-                    UpdateConcept(id=call.id, add_source=call.add_source)
-                )
+            return str(e), True
         self.record.concepts.append(call)
         return "recorded" + note, False
 

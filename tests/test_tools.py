@@ -276,6 +276,47 @@ def test_started_after_reopened_in_one_session_is_accepted(handler):
     assert _changes(handler) == ["reopened", "started"]
 
 
+def _chain_handler(handler):
+    """base in progress, odds unseen; bayes needs both."""
+    handler.syllabus = Syllabus(
+        goal="g",
+        subject="probability",
+        concepts=[
+            Concept(id="base", name="Base", status=Status.IN_PROGRESS),
+            Concept(id="odds", name="Odds"),
+            Concept(id="bayes", name="Bayes", prereqs=["base", "odds"]),
+        ],
+    )
+    handler.carded = set()
+    return handler
+
+
+def test_started_on_an_unseen_concept_needs_its_prereqs_done(handler):
+    h = _chain_handler(handler)
+    text, err = h.handle("update_concept", {"id": "bayes", "status_change": "started"})
+    assert err and text == "'bayes' is not ready: base, odds must be done first"
+    assert not h.record.concepts
+
+
+def test_started_is_accepted_once_prereqs_are_done_this_session(handler):
+    h = _chain_handler(handler)
+    done = {"status_change": "completed", "evidence": "x"}
+    h.handle("update_concept", {"id": "base", **done})
+    h.handle("update_concept", {"id": "odds", "status_change": "started"})
+    h.handle("update_concept", {"id": "odds", **done})
+    text, err = h.handle("update_concept", {"id": "bayes", "status_change": "started"})
+    assert not err and text == "recorded"
+
+
+def test_started_on_a_concept_in_progress_is_not_checked(handler):
+    h = _chain_handler(handler)
+    h.syllabus.concepts[2] = h.syllabus.concepts[2].model_copy(
+        update={"status": Status.IN_PROGRESS}
+    )
+    text, err = h.handle("update_concept", {"id": "bayes", "status_change": "started"})
+    assert not err and text == "recorded"
+
+
 def test_effective_replays_the_record_over_the_loaded_syllabus(handler):
     handler.handle("update_concept", {"id": "bayes", "status_change": "started"})
     assert handler.effective().concepts[0].status == "in-progress"
