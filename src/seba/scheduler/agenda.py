@@ -158,10 +158,13 @@ def _trouble_lines(state: GoalState) -> list[str]:
 
 def _emphasis_lines(state: GoalState) -> list[str]:
     often = {Emphasis.MORE: "more", Emphasis.LESS: "less"}
+    # A dropped concept's cards are not reviewed, so there is nothing to expect.
+    dropped = {c.id for c in state.syllabus.concepts if c.status == "dropped"}
     return [
         f"emphasis: [{cid}] {e} — the learner asked to see these cards "
         f"{often[e]} often."
         for cid, e in sorted(state.emphasis.items())
+        if cid not in dropped
     ]
 
 
