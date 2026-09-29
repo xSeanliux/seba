@@ -53,7 +53,10 @@ def load_concepts(path: Path) -> list[Concept]:
     except (OSError, UnicodeDecodeError, yaml.YAMLError, ValidationError) as e:
         raise SyllabusError(f"{path.name}: {e}") from e
     if not concepts:
-        raise SyllabusError(f"{path.name}: holds no concepts")
+        raise SyllabusError(
+            f"{path.name}: holds no concepts — expected a list of concepts, "
+            "or a mapping with a 'concepts:' list"
+        )
     return concepts
 
 

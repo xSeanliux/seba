@@ -131,6 +131,16 @@ def test_file_without_concepts_is_refused_naming_it(tmp_path, content):
     assert _syllabus_bytes(data) == before
 
 
+def test_no_concepts_says_what_is_expected(tmp_path):
+    store = _seed(tmp_path / "data")
+    with pytest.raises(StoreError) as e:
+        store.extend_syllabus("prob", _file(tmp_path, "goal: g\nsubject: s\n"))
+    assert str(e.value) == (
+        "more.yaml: holds no concepts — expected a list of concepts, "
+        "or a mapping with a 'concepts:' list"
+    )
+
+
 def test_both_file_shapes_are_accepted(tmp_path):
     store = _seed(tmp_path / "data")
     whole = {
