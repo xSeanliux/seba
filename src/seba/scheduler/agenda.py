@@ -79,8 +79,10 @@ def _reviews(
     """Due ∪ prereqs-of-today ∪ last session's error sites, the concepts with a
     card graded `again` (Rosenshine's daily review: due-ness is orthogonal to
     what today's lesson needs). Due items win the cap; the rest fill what's
-    left."""
-    picked = due_items(state.items, today, cap)
+    left. A dropped concept's cards are left out, their due dates untouched."""
+    dropped = {c.id for c in state.syllabus.concepts if c.status == "dropped"}
+    items = [i for i in state.items if i.concept not in dropped]
+    picked = due_items(items, today, cap)
     seen = {i.id for i in picked}
     warm = set(state.last_session_errors)
     if teach_src is not None:
@@ -88,7 +90,7 @@ def _reviews(
     extra = sorted(
         (
             i
-            for i in state.items
+            for i in items
             if i.concept in warm and i.id not in seen and not i.suspended
         ),
         key=lambda i: (i.concept, i.id),
@@ -125,11 +127,12 @@ def _trouble_lines(state: GoalState) -> list[str]:
     the scheduler has already decided when each of these cards comes back."""
     concept_of = {i.id: i.concept for i in state.items}
     done = {c.id for c in state.syllabus.concepts if c.status == "done"}
+    dropped = {c.id for c in state.syllabus.concepts if c.status == "dropped"}
     lines = []
     for r in state.last_trouble:
         cid = concept_of.get(r.id)
-        if cid is None:
-            continue  # card since deleted
+        if cid is None or cid in dropped:
+            continue  # card since deleted, or its concept set aside
         note = " ".join((r.note or "").split())  # a newline would split the line
         said = f' — "{note}"' if note else ""
         if r.grade == Grade.AGAIN:

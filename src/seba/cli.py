@@ -212,10 +212,15 @@ def mint(
 def concept_cmd(
     goal: str,
     concept_id: str,
-    status: str | None = typer.Option(None, help="started|completed|reopened"),
+    status: str | None = typer.Option(
+        None, help="started|completed|reopened|dropped|restored"
+    ),
     note: str | None = typer.Option(None),
     evidence: str | None = typer.Option(
         None, help="required with --status completed: the exchange that showed it"
+    ),
+    add_source: str | None = typer.Option(
+        None, help="a locator to add to the concept's sources"
     ),
 ):
     _dispatch(
@@ -226,6 +231,7 @@ def concept_cmd(
             "status_change": status,
             "note": note,
             "evidence": evidence,
+            "add_source": add_source,
         },
     )
 

@@ -101,6 +101,13 @@ class ToolHandler:
             ), True
         if call.concept not in {c.id for c in self.syllabus.concepts}:
             return f"unknown concept: '{call.concept}'", True
+        if any(
+            c.id == call.concept and c.status == Status.DROPPED
+            for c in self.effective().concepts
+        ):
+            return (
+                f"'{call.concept}' is dropped; restore it before minting a card for it"
+            ), True
         self.record.new_items.append(call)
         return "minted", False
 
@@ -108,7 +115,19 @@ class ToolHandler:
         if call.id not in {c.id for c in self.syllabus.concepts}:
             return f"unknown concept: '{call.id}'", True
         syllabus = self.effective()
-        status = next(c.status for c in syllabus.concepts if c.id == call.id)
+        concept = next(c for c in syllabus.concepts if c.id == call.id)
+        status = concept.status
+        if call.add_source is not None:
+            if not call.add_source.strip():
+                return "--add-source needs a locator", True
+            if call.add_source in concept.sources:
+                return f"'{call.add_source}' is already a source of '{call.id}'", True
+        # One answer for every move but restore, whichever rule below would
+        # otherwise speak first.
+        if call.status_change in ("started", "completed", "reopened") and (
+            status == Status.DROPPED
+        ):
+            return f"'{call.id}' is dropped; restore it first", True
         if call.status_change == "reopened" and status != Status.DONE:
             return (
                 f"'{call.id}' is {status}; only a done concept can be reopened"
@@ -157,6 +176,12 @@ class ToolHandler:
             )
             if not repeat:
                 return str(e), True
+            if call.add_source:
+                # `seba end` skips the repeated status, and the source with
+                # it, so the source goes in on its own too.
+                self.record.concepts.append(
+                    UpdateConcept(id=call.id, add_source=call.add_source)
+                )
         self.record.concepts.append(call)
         return "recorded" + note, False
 
