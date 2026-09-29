@@ -34,12 +34,16 @@ deterministic half only through the CLI, directed by the `seba-tutor` skill.
 - **Imports run strictly downward:** `cli → session → scheduler → store`;
   `syllabus` is a sibling used by `cli`/`store`. No circular imports.
 - **`ToolHandler` owns all outcome validation.** Never add a second validator
-  or default silently. Grades are `again | hard | good | easy | skipped`;
+  or default silently. Grades are `again | hard | good | easy | skipped`, and a
+  card whose concept is dropped takes only `skipped`;
   concept status moves `unseen → in-progress → done` one step forward only,
   except `reopened` (`done → in-progress`), `dropped` (from any other status, while no
   live concept has it as a hard prereq) and `restored` (back to the status it
-  was dropped from). Every concept call is judged against the syllabus as this
-  session's record leaves it, not as it was at `seba start`;
+  was dropped from, while none of its hard prereqs is dropped); `started` on an
+  unseen concept needs its hard prereqs done. Every concept call is judged
+  against the syllabus as this session's record leaves it, not as it was at
+  `seba start`, and so is `seba extend`'s refusal of a new concept on a
+  dropped one;
   `mint_item` is capped per session by `mint_budget`: 2 to 5, depending on
   the subject's review capacity.
 - **Fail loudly.** A malformed state file raises an error naming the file; a
@@ -73,7 +77,7 @@ is the exception).
 | `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record a review grade; `--note` is required on `hard` and `again` |
 | `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create a spaced-repetition card |
 | `seba concept GOAL ID [--status started\|completed\|reopened\|dropped\|restored] [--evidence TEXT] [--note TEXT] [--add-source LOCATOR]` | record concept progress, a note, or a source; `completed` requires `--evidence`; `reopened` is only for a done concept, once the learner has agreed. Drops, restores and sources are applied at `seba end` |
-| `seba extend GOAL --from-file PATH` | append concepts to the goal's syllabus; validated whole, written at once, works with or without a session pending |
+| `seba extend GOAL --from-file PATH` | append concepts to the goal's syllabus; validated whole, written at once, works with or without a session pending; refuses a new concept whose hard prereq is dropped |
 | `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more] [--direction TEXT]` | no flags: print the goal's direction, settings and emphasis; with flags: change them. `--direction` is written at once. Works during a session, but the session's review list and follow-on concepts were fixed at `seba start`: emphasis `more` and `--concepts-per-session` show from the next session. Retention, the interval ceiling and emphasis take effect at each card's next review, including cards graded later in this session |
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session |
 | `seba abandon GOAL [--discard]` | quit early: save as INCOMPLETE (or discard) |
