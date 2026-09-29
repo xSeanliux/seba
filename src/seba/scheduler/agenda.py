@@ -117,7 +117,7 @@ def _stuck_lines(state: GoalState) -> list[str]:
         lines.append(
             f"stuck: [{c.id}] in progress for {n} session(s), correctness "
             f"{rate:.2f} over {len(graded)} graded — change approach: split the "
-            "concept, drop to a prerequisite, or switch representation."
+            "concept, step back to a prerequisite, or switch representation."
         )
     return lines
 

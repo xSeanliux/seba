@@ -221,7 +221,10 @@ def test_stuck_check_threshold(tmp_path):
     assert (
         "stuck: [b] in progress for 3 session(s), correctness 0.25 over 4 graded" in b
     )
-    assert "switch representation" in b
+    assert (
+        "change approach: split the concept, step back to a prerequisite, or "
+        "switch representation." in b
+    )
 
     # under 4 graded opportunities the signal is noise — stay silent
     s2 = state(concepts, grades_by_concept={"b": ["again", "again", "hard"]})
