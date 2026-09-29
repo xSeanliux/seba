@@ -222,8 +222,13 @@ def build_agenda(
         ]
 
     front = ", ".join(c.id for c in frontier(state.syllabus)[:10])
+    unseen = [c.id for c in concepts if c.status == "unseen"]
+    dropped = sum(c.status == "dropped" for c in concepts)
     lines = [
-        f"Session {state.session_number}. Concepts done: {done}/{len(concepts)}.",
+        *([f"Direction: {state.direction}"] if state.direction else []),
+        f"Session {state.session_number}. Concepts: {done} done, "
+        f"{len(concepts) - done - dropped} open"
+        + (f", {dropped} dropped." if dropped else "."),
         f"Frontier: {front or 'none'}.",
     ]
     if session_type == SessionType.RETURN_AFTER_LAPSE:
@@ -258,6 +263,16 @@ def build_agenda(
         lines.append(
             f"next: {', '.join(c.id for c in following)} — {when} reaches a "
             "stopping point; ending the session there is always fine."
+        )
+    if len(unseen) <= 1:
+        left = (
+            f"nearly out of syllabus: 1 concept left unseen ({unseen[0]})"
+            if unseen
+            else "out of syllabus: no concept left unseen"
+        )
+        lines.append(
+            f"{left} — propose what comes next, or confirm with the learner "
+            "that the goal is finished."
         )
     lines += _stuck_lines(state)
     lines += _trouble_lines(state)
