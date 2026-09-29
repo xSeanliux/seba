@@ -218,7 +218,8 @@ def build_agenda(
 
     picked = _reviews(state, teach_src, today, profile.max_reviews_per_session)
     reviews = [
-        ReviewItem(id=i.id, type=i.type, front=i.front, back=i.back) for i in picked
+        ReviewItem(id=i.id, type=i.type, front=i.front, back=i.back, concept=i.concept)
+        for i in picked
     ]
 
     taught = None

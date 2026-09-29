@@ -119,6 +119,8 @@ class ReviewItem(BaseModel):
     type: ItemType
     front: str
     back: str
+    # Empty in a pending session saved before this field existed.
+    concept: str = ""
 
 
 class TeachConcept(BaseModel):

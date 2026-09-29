@@ -77,10 +77,21 @@ class ToolHandler:
         return getattr(self, f"_{name}")(call)
 
     def _grade_review(self, call: GradeReview) -> tuple[str, bool]:
-        if call.id not in {r.id for r in self.agenda.review_items}:
+        item = next((r for r in self.agenda.review_items if r.id == call.id), None)
+        if item is None:
             return f"'{call.id}' is not in this session's review items", True
         if call.id in {r.id for r in self.record.reviews}:
             return f"'{call.id}' already graded", True
+        # The review list was fixed at start; a concept dropped since must not
+        # have its cards rescheduled or counted as passes.
+        if call.grade != Grade.SKIPPED and any(
+            c.id == item.concept and c.status == Status.DROPPED
+            for c in self.effective().concepts
+        ):
+            return (
+                f"'{call.id}' belongs to '{item.concept}', which is dropped — "
+                "grade it skipped"
+            ), True
         if call.grade in (Grade.AGAIN, Grade.HARD) and not (call.note or "").strip():
             # Enforced here, not on GradeReview: the model also parses old
             # session outcomes, which have no notes.
