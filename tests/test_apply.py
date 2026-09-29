@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 
+import pytest
 from fsrs import Card
 
 from seba.models import (
@@ -14,7 +15,8 @@ from seba.models import (
     Syllabus,
     UpdateConcept,
 )
-from seba.scheduler.apply import apply_record
+from seba.scheduler.apply import apply_change, apply_record, replay
+from seba.syllabus.graph import SyllabusError
 
 NOW = datetime(2026, 7, 3, tzinfo=timezone.utc)
 
@@ -145,3 +147,37 @@ def test_an_unreviewed_card_keeps_its_due_date():
     s.items[0] = s.items[0].model_copy(update={"fsrs": _fsrs(far)})
     out = apply_record(s, SessionRecord(), NOW)
     assert out.items[0].fsrs["due"] == far
+
+
+def _syl(status="unseen"):
+    return Syllabus(
+        goal="g",
+        subject="probability",
+        concepts=[Concept(id="bayes", name="B", status=status)],
+    )
+
+
+def test_replay_skips_an_illegal_move_and_applies_the_rest():
+    changes = [
+        UpdateConcept(id="bayes", status_change="completed", evidence="e"),  # illegal
+        UpdateConcept(id="bayes", status_change="started"),
+        UpdateConcept(id="bayes", status_change="started"),  # a repeat: skipped
+        UpdateConcept(id="bayes", status_change="completed", evidence="e"),
+        UpdateConcept(id="bayes", status_change="reopened"),
+        UpdateConcept(id="bayes", note="a note moves nothing"),
+    ]
+    assert replay(_syl(), changes).concepts[0].status == "in-progress"
+    out = apply_record(state(), SessionRecord(concepts=changes), NOW)
+    assert out.syllabus == replay(_syl(), changes)
+
+
+def test_apply_change_without_a_move_returns_the_syllabus():
+    s = _syl()
+    assert apply_change(s, UpdateConcept(id="bayes", note="n")) is s
+
+
+@pytest.mark.parametrize("change", ["dropped", "restored"])
+def test_dropped_and_restored_move_nothing_yet(change):
+    with pytest.raises(SyllabusError):
+        apply_change(_syl(), UpdateConcept(id="bayes", status_change=change))
+    assert replay(_syl(), [UpdateConcept(id="bayes", status_change=change)]) == _syl()

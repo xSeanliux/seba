@@ -352,6 +352,22 @@ def test_a_reopened_concept_cannot_complete_in_the_same_session(monkeypatch, tmp
     assert result.exit_code == 1 and "0 of 1" in result.output
 
 
+def test_completing_a_concept_never_started_is_refused(monkeypatch, tmp_path):
+    store = seed(env(monkeypatch, tmp_path), with_item=False)  # no cards: no pass gate
+    runner.invoke(app, ["start", "prob"])
+    result = runner.invoke(
+        app, ["concept", "prob", "bayes", "--status", "completed", "--evidence", "x"]
+    )
+    assert result.exit_code == 1 and "unseen -> done" in result.output
+    runner.invoke(app, ["concept", "prob", "bayes", "--status", "started"])
+    result = runner.invoke(
+        app, ["concept", "prob", "bayes", "--status", "completed", "--evidence", "x"]
+    )
+    assert result.exit_code == 0, result.output
+    runner.invoke(app, ["end", "prob", "--summary", "s", "--hint", "h"])
+    assert _status(store) == "done"
+
+
 def test_a_concept_first_carded_this_session_cannot_complete_in_it(
     monkeypatch, tmp_path
 ):

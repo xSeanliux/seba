@@ -69,9 +69,7 @@ class Store:
         (gdir / "goal.yaml").write_text(
             yaml.safe_dump({"name": name, "subject": subject})
         )
-        (gdir / "syllabus.yaml").write_text(
-            yaml.safe_dump(syllabus.model_dump(mode="json"), sort_keys=False)
-        )
+        self._write_syllabus(gdir, syllabus)
         (gdir / "items.jsonl").write_text("")
         (gdir / "notes.md").write_text("")
         self._git("add", "-A")
@@ -101,6 +99,14 @@ class Store:
         )
         tmp.rename(gdir / "items.jsonl")
 
+    def _write_syllabus(self, gdir: Path, syllabus: Syllabus) -> None:
+        # exclude_none: `dropped_from` appears only on a dropped concept.
+        (gdir / "syllabus.yaml").write_text(
+            yaml.safe_dump(
+                syllabus.model_dump(mode="json", exclude_none=True), sort_keys=False
+            )
+        )
+
     def save_tuning(
         self,
         name: str,
@@ -115,7 +121,11 @@ class Store:
         meta = self._load_meta(path).model_copy(
             update={"settings": settings, "emphasis": emphasis}
         )
-        path.write_text(yaml.safe_dump(meta.model_dump(mode="json"), sort_keys=False))
+        path.write_text(
+            yaml.safe_dump(
+                meta.model_dump(mode="json", exclude_none=True), sort_keys=False
+            )
+        )
         self._write_items(gdir, items)
         paths = (f"goals/{name}/goal.yaml", f"goals/{name}/items.jsonl")
         self._git("add", *paths)
@@ -192,6 +202,7 @@ class Store:
         return GoalState(
             name=name,
             subject=meta.subject,
+            direction=(meta.direction or "").strip() or syllabus.goal.strip(),
             syllabus=syllabus,
             items=items,
             notes=(gdir / "notes.md").read_text(),
@@ -238,9 +249,7 @@ class Store:
         (sdir / f"{n}.transcript.md").write_text(transcript)
 
         self._write_items(gdir, updated.items)
-        (gdir / "syllabus.yaml").write_text(
-            yaml.safe_dump(updated.syllabus.model_dump(mode="json"), sort_keys=False)
-        )
+        self._write_syllabus(gdir, updated.syllabus)
 
         noted = [c for c in record.concepts if c.note]
         if noted:

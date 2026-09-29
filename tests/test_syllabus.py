@@ -185,3 +185,22 @@ def test_new_fields_round_trip(tmp_path: Path):
     p = tmp_path / "syllabus.yaml"
     p.write_text(yaml.safe_dump(s.model_dump(mode="json"), sort_keys=False))
     assert load_syllabus(p) == s
+
+
+def test_a_dropped_concept_and_what_needs_it_leave_the_frontier():
+    s = make(
+        [
+            Concept(id="a", name="A", status="dropped", dropped_from="unseen"),
+            Concept(id="b", name="B", prereqs=["a"]),
+            Concept(id="c", name="C"),
+        ]
+    )
+    assert [c.id for c in frontier(s)] == ["c"]
+
+
+@pytest.mark.parametrize("status", ["unseen", "in-progress", "done"])
+@pytest.mark.parametrize("reopen", [False, True])
+def test_apply_status_on_a_dropped_concept_is_a_syllabus_error(status, reopen):
+    s = make([Concept(id="a", name="A", status="dropped", dropped_from="done")])
+    with pytest.raises(SyllabusError, match="dropped"):
+        apply_status(s, "a", status, reopen=reopen)

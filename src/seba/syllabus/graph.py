@@ -44,10 +44,11 @@ def load_syllabus(path: Path) -> Syllabus:
 
 def frontier(s: Syllabus) -> list[Concept]:
     done = {c.id for c in s.concepts if c.status == "done"}
+    # A dropped concept is not done, so what needs it waits too.
     return [
         c
         for c in s.concepts
-        if c.status != "done" and all(p in done for p in c.prereqs)
+        if c.status not in ("done", "dropped") and all(p in done for p in c.prereqs)
     ]
 
 
@@ -74,6 +75,8 @@ def apply_status(
     for c in s.concepts:
         if c.id == concept_id:
             found = True
+            if c.status == "dropped":
+                raise SyllabusError(f"'{concept_id}' is dropped; restore it first")
             # Forward one step, or a reopen. Nothing reopens by itself: the
             # tutor proposes it and the learner agrees (docs/adr/0001), so
             # done -> in-progress needs `reopen`, and `reopen` allows only that.

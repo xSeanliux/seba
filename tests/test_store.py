@@ -418,3 +418,39 @@ def test_old_outcomes_without_notes_still_load(store):
     _save(store, gs, GradeReview(id="it-1", grade="again"))  # as written before
     gs2 = store.load_goal("prob")
     assert gs2.last_trouble[0].note is None and gs2.again_runs == {"it-1": 1}
+
+
+def _syllabus_yaml(store):
+    return yaml.safe_load(
+        (store.data_dir / "goals" / "prob" / "syllabus.yaml").read_text()
+    )
+
+
+def test_syllabus_yaml_has_no_dropped_from_unless_a_concept_is_dropped(store):
+    store.create_goal("prob", syl(), "probability")
+    assert "dropped_from" not in _syllabus_yaml(store)["concepts"][0]
+    _save(store, store.load_goal("prob"))
+    assert "dropped_from" not in _syllabus_yaml(store)["concepts"][0]
+    dropped = Concept(id="bayes", name="B", status="dropped", dropped_from="unseen")
+    gs = store.load_goal("prob")
+    gs.syllabus.concepts[0] = dropped
+    _save(store, gs)
+    assert store.load_goal("prob").syllabus.concepts[0] == dropped
+
+
+def test_direction_falls_back_to_the_syllabus_goal_line(store):
+    s = syl().model_copy(update={"goal": "  read the Bayes literature \n"})
+    store.create_goal("prob", s, "probability")
+    assert store.load_goal("prob").direction == "read the Bayes literature"
+    path = _goal_yaml(store)
+    base = path.read_text()
+    path.write_text(base + "direction: '   '\n")
+    assert store.load_goal("prob").direction == "read the Bayes literature"
+    path.write_text(base + "direction: judge priors in A/B tests\n")
+    assert store.load_goal("prob").direction == "judge priors in A/B tests"
+
+
+def test_save_tuning_writes_no_empty_direction(store):
+    store.create_goal("prob", syl(), "probability")
+    store.save_tuning("prob", GoalSettings(desired_retention=0.85), {}, [])
+    assert "direction" not in yaml.safe_load(_goal_yaml(store).read_text())

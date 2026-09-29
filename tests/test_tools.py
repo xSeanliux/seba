@@ -127,12 +127,14 @@ def test_completed_needs_a_later_pass(handler):
 
 
 def test_completed_allowed_after_a_later_pass(handler):
+    _set_status(handler, Status.IN_PROGRESS)
     handler.passes = {"bayes": 1}
     text, err = handler.handle("update_concept", COMPLETE)
     assert not err and text == "recorded"
 
 
 def test_completion_passes_raises_the_bar(handler):
+    _set_status(handler, Status.IN_PROGRESS)
     handler.completion_passes = 2
     handler.passes = {"bayes": 1}
     text, err = handler.handle("update_concept", COMPLETE)
@@ -150,6 +152,7 @@ def test_completed_needs_evidence_field(handler):
 
 
 def test_concept_without_cards_bypasses_the_delayed_check(handler):
+    _set_status(handler, Status.IN_PROGRESS)
     handler.carded = set()
     text, err = handler.handle(
         "update_concept",
@@ -212,3 +215,68 @@ def test_reopening_restarts_the_count_within_the_session(handler):
     text, err2 = handler.handle("update_concept", COMPLETE)
     assert err2 and "0 of 1" in text
     assert [c.status_change for c in handler.record.concepts] == ["reopened"]
+
+
+def _changes(handler):
+    return [c.status_change for c in handler.record.concepts]
+
+
+def test_completed_on_an_unseen_concept_is_refused(handler):
+    handler.passes = {"bayes": 1}
+    text, err = handler.handle("update_concept", COMPLETE)
+    assert err and "'bayes'" in text and "unseen -> done" in text
+    assert not handler.record.concepts
+
+
+def test_started_twice_is_accepted(handler):
+    for _ in range(2):
+        text, err = handler.handle(
+            "update_concept", {"id": "bayes", "status_change": "started"}
+        )
+        assert not err and text == "recorded"
+    assert _changes(handler) == ["started", "started"]
+
+
+def test_started_then_completed_in_one_session(handler):
+    handler.passes = {"bayes": 1}
+    handler.handle("update_concept", {"id": "bayes", "status_change": "started"})
+    _, err = handler.handle("update_concept", COMPLETE)
+    assert not err and handler.effective().concepts[0].status == "done"
+
+
+def test_completed_twice_is_accepted_as_a_repeat(handler):
+    _set_status(handler, Status.IN_PROGRESS)
+    handler.passes = {"bayes": 1}
+    for _ in range(2):
+        _, err = handler.handle("update_concept", COMPLETE)
+        assert not err
+    assert _changes(handler) == ["completed", "completed"]
+
+
+def test_reopened_twice_in_one_session_is_refused_the_second_time(handler):
+    _set_status(handler, Status.DONE)
+    _, err = handler.handle(
+        "update_concept", {"id": "bayes", "status_change": "reopened"}
+    )
+    assert not err
+    text, err2 = handler.handle(
+        "update_concept", {"id": "bayes", "status_change": "reopened"}
+    )
+    assert err2 and "only a done concept can be reopened" in text
+    assert _changes(handler) == ["reopened"]
+
+
+def test_started_after_reopened_in_one_session_is_accepted(handler):
+    _set_status(handler, Status.DONE)
+    handler.handle("update_concept", {"id": "bayes", "status_change": "reopened"})
+    text, err = handler.handle(
+        "update_concept", {"id": "bayes", "status_change": "started"}
+    )
+    assert not err and text == "recorded"
+    assert _changes(handler) == ["reopened", "started"]
+
+
+def test_effective_replays_the_record_over_the_loaded_syllabus(handler):
+    handler.handle("update_concept", {"id": "bayes", "status_change": "started"})
+    assert handler.effective().concepts[0].status == "in-progress"
+    assert handler.syllabus.concepts[0].status == "unseen"

@@ -13,6 +13,7 @@ from seba.models import (
     SessionRecord,
     SubjectProfile,
     Syllabus,
+    UpdateConcept,
 )
 
 
@@ -141,3 +142,19 @@ def test_goal_settings_defaults():
 def test_goal_settings_refuses_out_of_range(field, value):
     with pytest.raises(ValidationError):
         GoalSettings.model_validate({field: value})
+
+
+def test_a_dropped_concept_round_trips_with_where_it_returns_to():
+    c = Concept(id="bayes", name="Bayes", status="dropped", dropped_from="in-progress")
+    back = Concept.model_validate(c.model_dump(mode="json"))
+    assert back == c and back.dropped_from == "in-progress"
+
+
+def test_a_concept_written_before_dropped_existed_loads():
+    c = Concept.model_validate({"id": "bayes", "name": "Bayes", "status": "done"})
+    assert c.dropped_from is None
+
+
+@pytest.mark.parametrize("change", ["dropped", "restored"])
+def test_update_concept_accepts_dropped_and_restored(change):
+    assert UpdateConcept(id="bayes", status_change=change).status_change == change

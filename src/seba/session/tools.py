@@ -13,6 +13,8 @@ from seba.models import (
     Syllabus,
     UpdateConcept,
 )
+from seba.scheduler.apply import apply_change, replay
+from seba.syllabus.graph import SyllabusError
 
 
 def mint_budget(max_reviews_per_session: int) -> int:
@@ -52,6 +54,13 @@ class ToolHandler:
         self.carded = carded
         self.mint_budget = mint_budget(max_reviews_per_session)
         self.record = SessionRecord()
+
+    def effective(self) -> Syllabus:
+        """The syllabus as `seba end` will leave it: the one loaded at the
+        start of this command, with this session's record replayed over it.
+        Nothing reaches syllabus.yaml until then, so every status rule reads
+        this, never `self.syllabus`."""
+        return replay(self.syllabus, self.record.concepts)
 
     def missing_grades(self) -> list[str]:
         graded = {r.id for r in self.record.reviews}
@@ -98,7 +107,8 @@ class ToolHandler:
     def _update_concept(self, call: UpdateConcept) -> tuple[str, bool]:
         if call.id not in {c.id for c in self.syllabus.concepts}:
             return f"unknown concept: '{call.id}'", True
-        status = next(c.status for c in self.syllabus.concepts if c.id == call.id)
+        syllabus = self.effective()
+        status = next(c.status for c in syllabus.concepts if c.id == call.id)
         if call.status_change == "reopened" and status != Status.DONE:
             return (
                 f"'{call.id}' is {status}; only a done concept can be reopened"
@@ -136,6 +146,17 @@ class ToolHandler:
             # No cards means the delayed check can never be satisfied; allowing it
             # unremarked would hide that this completion rests on the tutor alone.
             note = " (no cards for this concept, so the delayed check was skipped)"
+        try:
+            apply_change(syllabus, call)
+        except SyllabusError as e:
+            # Re-reporting the status a concept already has is normal (a
+            # repeated `started` above all) and harmless: `seba end` skips it.
+            repeat = (call.status_change, status) in (
+                ("started", Status.IN_PROGRESS),
+                ("completed", Status.DONE),
+            )
+            if not repeat:
+                return str(e), True
         self.record.concepts.append(call)
         return "recorded" + note, False
 

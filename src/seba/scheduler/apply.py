@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from seba.models import GoalState, SessionRecord, Status
+from seba.models import GoalState, SessionRecord, Status, Syllabus, UpdateConcept
 from seba.scheduler.items import apply_review, mint_item
 from seba.syllabus.graph import SyllabusError, apply_status
 
@@ -9,6 +9,30 @@ _STATUS: dict[str, Status] = {
     "completed": Status.DONE,
     "reopened": Status.IN_PROGRESS,
 }
+
+
+def apply_change(syllabus: Syllabus, change: UpdateConcept) -> Syllabus:
+    """Apply one concept change. Raises SyllabusError if the move is illegal."""
+    if change.status_change is None:
+        return syllabus
+    # Placeholder: drop and restore are not built yet.
+    if change.status_change in ("dropped", "restored"):
+        raise SyllabusError(f"'{change.status_change}' is not supported yet")
+    return apply_status(
+        syllabus,
+        change.id,
+        _STATUS[change.status_change],
+        reopen=change.status_change == "reopened",
+    )
+
+
+def replay(syllabus: Syllabus, changes: list[UpdateConcept]) -> Syllabus:
+    for c in changes:
+        try:
+            syllabus = apply_change(syllabus, c)
+        except SyllabusError:
+            pass  # re-reported or illegal move: never corrupt state
+    return syllabus
 
 
 def apply_record(state: GoalState, record: SessionRecord, now: datetime) -> GoalState:
@@ -27,17 +51,5 @@ def apply_record(state: GoalState, record: SessionRecord, now: datetime) -> Goal
     # timezones, making the card miss the next-day agenda.
     items += [mint_item(m, now.astimezone().date()) for m in record.new_items]
 
-    syllabus = state.syllabus
-    for c in record.concepts:
-        if c.status_change:
-            try:
-                syllabus = apply_status(
-                    syllabus,
-                    c.id,
-                    _STATUS[c.status_change],
-                    reopen=c.status_change == "reopened",
-                )
-            except SyllabusError:
-                pass  # re-reported or illegal move: never corrupt state
-
+    syllabus = replay(state.syllabus, record.concepts)
     return state.model_copy(update={"items": items, "syllabus": syllabus})

@@ -25,6 +25,7 @@ class Status(StrEnum):
     UNSEEN = "unseen"
     IN_PROGRESS = "in-progress"
     DONE = "done"
+    DROPPED = "dropped"
 
 
 class SessionType(StrEnum):
@@ -66,6 +67,9 @@ class GoalMeta(BaseModel):
     subject: str
     settings: GoalSettings = Field(default_factory=GoalSettings)
     emphasis: dict[str, Emphasis] = Field(default_factory=dict)
+    # What the goal is for, as the learner now puts it; the syllabus's `goal`
+    # line stands in until they set one.
+    direction: str | None = None
 
     @field_validator("emphasis", mode="before")
     @classmethod
@@ -87,6 +91,8 @@ class Concept(BaseModel):
     confusable_with: list[str] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list)
     status: Status = Status.UNSEEN
+    # The status a dropped concept returns to when restored; None unless dropped.
+    dropped_from: Status | None = None
     est_sessions: int = 1
     kc_type: Literal["fact", "concept", "procedure", "principle"] = "concept"
 
@@ -173,8 +179,11 @@ class UpdateConcept(BaseModel):
     """Record concept progress or a note (misconception, strength)."""
 
     id: str
-    status_change: Literal["started", "completed", "reopened"] | None = None
+    status_change: (
+        Literal["started", "completed", "reopened", "dropped", "restored"] | None
+    ) = None
     note: str | None = None
+    add_source: str | None = None
     # Required on `completed`, but enforced in ToolHandler, not here: this model
     # also parses historical outcomes written before the field existed, and a
     # validator would make old sessions unreadable.
@@ -209,6 +218,7 @@ class SubjectProfile(BaseModel):
 class GoalState(BaseModel):
     name: str
     subject: str
+    direction: str = ""
     syllabus: Syllabus
     items: list[Item]
     notes: str = ""
