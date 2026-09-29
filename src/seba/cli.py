@@ -177,16 +177,33 @@ def _finish(store: Store, goal: str, pending: PendingSession, ppath) -> None:
 
 
 @app.command()
-def start(goal: str):
+def start(
+    goal: str,
+    concept: str | None = typer.Option(
+        None, "--concept", help="teach this concept today instead of the usual pick"
+    ),
+):
     store = _store()
     state = _load_goal(store, goal)
     ppath = pending_path(store.data_dir, goal)
     pending = _load_pending_or_exit(ppath)
+    if pending is not None and concept is not None:
+        raise _refuse(
+            f"a session is already in progress for '{goal}' — end or abandon it "
+            "before choosing a concept"
+        )
     if pending is None:
         profile = _profile(state.subject)  # only needed to build a new agenda
-        agenda = build_agenda(
-            state, profile, date.today(), config.data_dir() / "sources"
-        )
+        try:
+            agenda = build_agenda(
+                state,
+                profile,
+                date.today(),
+                config.data_dir() / "sources",
+                teach=concept,
+            )
+        except SyllabusError as e:
+            raise _refuse(str(e))
         pending = PendingSession(goal=goal, agenda=agenda, started=date.today())
         save_pending(ppath, pending)
     else:

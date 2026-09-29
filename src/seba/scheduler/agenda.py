@@ -17,7 +17,7 @@ from seba.models import (
 )
 from seba.scheduler.items import due_items
 from seba.store.store import parse_notes
-from seba.syllabus.graph import confusables, frontier
+from seba.syllabus.graph import check_teachable, confusables, frontier
 
 BRIEFING_BUDGET = 4_000
 EXCERPT_BUDGET = 16_000
@@ -189,18 +189,31 @@ def _teach(
 
 
 def build_agenda(
-    state: GoalState, profile: SubjectProfile, today: date, sources_dir: Path
+    state: GoalState,
+    profile: SubjectProfile,
+    today: date,
+    sources_dir: Path,
+    *,
+    teach: str | None = None,
 ) -> Agenda:
     concepts = state.syllabus.concepts
     by_id = {c.id: c for c in concepts}
     done = sum(c.status == "done" for c in concepts)
     session_type = _session_type(state, today, done)
+    # The learner asked for a concept: that outranks a synthesis or
+    # return-after-lapse day.
+    steered = check_teachable(state.syllabus, teach) if teach is not None else None
+    if steered is not None:
+        session_type = SessionType.ORDINARY
 
     ready: list[Concept] = []
     if session_type == SessionType.ORDINARY:
         in_progress = [c for c in concepts if c.status == "in-progress"]
         rest = [c for c in frontier(state.syllabus) if c.status != "in-progress"]
-        ready = (in_progress + rest)[: state.settings.concepts_per_session]
+        ready = in_progress + rest
+        if steered is not None:
+            ready = [steered] + [c for c in ready if c.id != steered.id]
+        ready = ready[: state.settings.concepts_per_session]
     teach_src = ready[0] if ready else None
 
     picked = _reviews(state, teach_src, today, profile.max_reviews_per_session)
@@ -208,13 +221,13 @@ def build_agenda(
         ReviewItem(id=i.id, type=i.type, front=i.front, back=i.back) for i in picked
     ]
 
-    teach = None
+    taught = None
     following: list[TeachConcept] = []
     scope = {i.concept for i in picked}
     unmastered: list[str] = []
     soft_unmastered: list[str] = []
     if teach_src is not None:
-        teach, budget = _teach(state, teach_src, sources_dir, EXCERPT_BUDGET)
+        taught, budget = _teach(state, teach_src, sources_dir, EXCERPT_BUDGET)
         for src in ready[1:]:
             follow, budget = _teach(state, src, sources_dir, budget)
             following.append(follow)
@@ -242,6 +255,8 @@ def build_agenda(
             "the concepts already done connect, and push a problem that needs "
             "several of them together."
         )
+    if steered is not None:
+        lines.append(f"steered: the learner asked for [{steered.id}] today.")
     if unmastered:
         lines.append(
             f"prereqs not yet done: {', '.join(unmastered)} — offer a short review "
@@ -285,7 +300,7 @@ def build_agenda(
         session_number=state.session_number,
         briefing=briefing,
         review_items=reviews,
-        teach_concept=teach,
+        teach_concept=taught,
         next_concepts=following,
         practice_quota=PRACTICE_QUOTA[pace],
         pace_hint=pace,
