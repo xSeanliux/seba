@@ -86,6 +86,18 @@ def test_start_resumes_existing_pending(monkeypatch, tmp_path):
     assert out["already_graded"] == ["it-1"] and out["ungraded_reviews"] == []
 
 
+def test_start_reports_the_concept_calls_recorded_so_far(monkeypatch, tmp_path):
+    seed(env(monkeypatch, tmp_path))
+    out = yaml.safe_load(runner.invoke(app, ["start", "prob"]).output)
+    assert out["concept_calls_so_far"] == 0
+    runner.invoke(app, ["concept", "prob", "bayes", "--status", "started"])
+    runner.invoke(app, ["concept", "prob", "bayes", "--note", "MISCONCEPTION: x"])
+    result = runner.invoke(app, ["start", "prob"])
+    out = yaml.safe_load(result.output.split("\n", 1)[1])  # skip the resuming line
+    assert out["already_graded"] == [] and out["minted_so_far"] == 0
+    assert out["concept_calls_so_far"] == 2
+
+
 def test_malformed_pending_fails_cleanly(monkeypatch, tmp_path):
     from seba.session.pending import PendingError
 

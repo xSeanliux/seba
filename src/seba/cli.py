@@ -224,6 +224,7 @@ def start(
                     r.id for r in pending.agenda.review_items if r.id not in set(graded)
                 ],
                 "minted_so_far": len(pending.record.new_items),
+                "concept_calls_so_far": len(pending.record.concepts),
             },
             sort_keys=False,
             allow_unicode=True,
