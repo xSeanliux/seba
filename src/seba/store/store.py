@@ -18,7 +18,7 @@ from seba.models import (
     SessionRecord,
     Syllabus,
 )
-from seba.syllabus.graph import SyllabusError, load_syllabus
+from seba.syllabus.graph import SyllabusError, extend, load_concepts, load_syllabus
 
 
 class StoreError(Exception):
@@ -74,6 +74,24 @@ class Store:
         (gdir / "notes.md").write_text("")
         self._git("add", "-A")
         self._git("commit", "-m", f"{name}: created")
+
+    def extend_syllabus(self, name: str, path: Path) -> list[str]:
+        """Append the concepts in `path`; returns their ids in file order.
+        Everything is checked before anything is written. Leaves any pending
+        session alone: the next command builds its handler from this file."""
+        syllabus = self.load_goal(name).syllabus
+        try:
+            new = load_concepts(path)
+        except SyllabusError as e:
+            raise StoreError(str(e)) from e
+        try:
+            merged = extend(syllabus, new)
+        except SyllabusError as e:
+            raise StoreError(f"{path.name}: {e}") from e
+        self._write_syllabus(self._goal_dir(name), merged)
+        self._git("add", f"goals/{name}/syllabus.yaml")
+        self._git("commit", "-m", f"{name}: extended (+{len(new)})")
+        return [c.id for c in new]
 
     def _load_items(self, path: Path) -> list[Item]:
         items = []
