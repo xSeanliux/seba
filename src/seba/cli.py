@@ -82,6 +82,27 @@ def new_goal(
     typer.echo(f"goal '{name}' created — start with: seba start {name}")
 
 
+@app.command("extend")
+def extend_cmd(
+    goal: str,
+    from_file: Path = typer.Option(
+        ...,
+        "--from-file",
+        exists=True,
+        dir_okay=False,
+        help="concepts YAML to add, drafted in conversation",
+    ),
+):
+    # Never touches the pending session: its agenda stands, and the next
+    # command's handler is built from the extended syllabus on disk.
+    try:
+        added = _store().extend_syllabus(goal, from_file)
+    except StoreError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    typer.echo(f"added {len(added)} concept(s): {', '.join(added)}")
+
+
 @app.command()
 def status():
     try:

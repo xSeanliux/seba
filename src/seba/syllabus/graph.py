@@ -2,7 +2,7 @@ from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 
 import yaml
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from seba.models import Concept, Status, Syllabus
 
@@ -40,6 +40,42 @@ def load_syllabus(path: Path) -> Syllabus:
     except (yaml.YAMLError, ValidationError, SyllabusError) as e:
         raise SyllabusError(f"{path.name}: {e}") from e
     return s
+
+
+def load_concepts(path: Path) -> list[Concept]:
+    """Concepts from a bare list, or from the `concepts:` of a mapping (a whole
+    syllabus file works; its goal and subject are ignored)."""
+    try:
+        raw = yaml.safe_load(path.read_text())
+        if isinstance(raw, dict):
+            raw = raw.get("concepts")
+        concepts = TypeAdapter(list[Concept]).validate_python(raw or [])
+    except (OSError, UnicodeDecodeError, yaml.YAMLError, ValidationError) as e:
+        raise SyllabusError(f"{path.name}: {e}") from e
+    if not concepts:
+        raise SyllabusError(f"{path.name}: holds no concepts")
+    return concepts
+
+
+def extend(s: Syllabus, new: list[Concept]) -> Syllabus:
+    """The syllabus with `new` appended, validated whole."""
+    have = {c.id for c in s.concepts}
+    taken = sorted({c.id for c in new if c.id in have})
+    if taken:
+        raise SyllabusError(f"concept ids already in the syllabus: {taken}")
+    ids = [c.id for c in new]
+    repeated = sorted({i for i in ids if ids.count(i) > 1})
+    if repeated:
+        raise SyllabusError(f"concept ids repeated in the file: {repeated}")
+    for c in new:
+        if c.status not in ("unseen", "done") or c.dropped_from is not None:
+            raise SyllabusError(
+                f"new concept '{c.id}' has status {c.status}; "
+                "a new concept is unseen, or done if the learner already has it"
+            )
+    merged = s.model_copy(update={"concepts": [*s.concepts, *new]})
+    validate(merged)
+    return merged
 
 
 def frontier(s: Syllabus) -> list[Concept]:
