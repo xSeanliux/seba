@@ -52,6 +52,29 @@ def frontier(s: Syllabus) -> list[Concept]:
     ]
 
 
+def check_teachable(s: Syllabus, concept_id: str) -> Concept:
+    """The concept, if it is in progress or on the frontier; else why not."""
+    by_id = {c.id: c for c in s.concepts}
+    c = by_id.get(concept_id)
+    if c is None:
+        raise SyllabusError(f"unknown concept: '{concept_id}'")
+    if c.status == "dropped":
+        raise SyllabusError(f"'{concept_id}' is dropped; restore it first")
+    if c.status == "done":
+        raise SyllabusError(
+            f"'{concept_id}' is done; reopen it if the learner wants it taught again"
+        )
+    if c.status == "in-progress":
+        return c
+    # Hard edges are the curriculum: name every one that stands in the way.
+    unmet = [p for p in c.prereqs if by_id[p].status != "done"]
+    if unmet:
+        raise SyllabusError(
+            f"'{concept_id}' is not ready: {', '.join(unmet)} must be done first"
+        )
+    return c
+
+
 def confusables(s: Syllabus, concept_id: str) -> list[str]:
     """Concepts confusable with this one, in both declared directions."""
     out: set[str] = set()
