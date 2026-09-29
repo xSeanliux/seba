@@ -17,7 +17,9 @@ from seba.models import (
     Item,
     SessionRecord,
     Syllabus,
+    UpdateConcept,
 )
+from seba.scheduler.apply import replay
 from seba.syllabus.graph import SyllabusError, extend, load_concepts, load_syllabus
 
 
@@ -75,17 +77,22 @@ class Store:
         self._git("add", "-A")
         self._git("commit", "-m", f"{name}: created")
 
-    def extend_syllabus(self, name: str, path: Path) -> list[str]:
+    def extend_syllabus(
+        self, name: str, path: Path, pending: list[UpdateConcept] | None = None
+    ) -> list[str]:
         """Append the concepts in `path`; returns their ids in file order.
         Everything is checked before anything is written. Leaves any pending
-        session alone: the next command builds its handler from this file."""
+        session alone: the next command builds its handler from this file.
+        `pending` is that session's concept changes: the new concepts are
+        judged against the syllabus as they have changed it, since the
+        session's drops must still be legal when `seba end` replays them."""
         syllabus = self.load_goal(name).syllabus
         try:
             new = load_concepts(path)
         except SyllabusError as e:
             raise StoreError(str(e)) from e
         try:
-            merged = extend(syllabus, new)
+            merged = extend(syllabus, new, against=replay(syllabus, pending or []))
         except SyllabusError as e:
             raise StoreError(f"{path.name}: {e}") from e
         self._write_syllabus(self._goal_dir(name), merged)

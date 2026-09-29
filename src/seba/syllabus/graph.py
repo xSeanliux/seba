@@ -57,8 +57,12 @@ def load_concepts(path: Path) -> list[Concept]:
     return concepts
 
 
-def extend(s: Syllabus, new: list[Concept]) -> Syllabus:
-    """The syllabus with `new` appended, validated whole."""
+def extend(
+    s: Syllabus, new: list[Concept], *, against: Syllabus | None = None
+) -> Syllabus:
+    """The syllabus with `new` appended, validated whole. A new concept may not
+    stand on a concept dropped in `against` (default `s`): the syllabus as a
+    pending session has changed it, which is what `s` will become."""
     have = {c.id for c in s.concepts}
     taken = sorted({c.id for c in new if c.id in have})
     if taken:
@@ -72,6 +76,18 @@ def extend(s: Syllabus, new: list[Concept]) -> Syllabus:
             raise SyllabusError(
                 f"new concept '{c.id}' has status {c.status}; "
                 "a new concept is unseen, or done if the learner already has it"
+            )
+    dropped = {
+        c.id
+        for c in (s if against is None else against).concepts
+        if c.status == "dropped"
+    }
+    for c in new:
+        gone = [p for p in c.prereqs if p in dropped]
+        if gone:
+            raise SyllabusError(
+                f"new concept '{c.id}' depends on {', '.join(gone)}, which is "
+                "dropped — restore that first"
             )
     merged = s.model_copy(update={"concepts": [*s.concepts, *new]})
     validate(merged)

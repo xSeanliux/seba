@@ -94,9 +94,14 @@ def extend_cmd(
     ),
 ):
     # Never touches the pending session: its agenda stands, and the next
-    # command's handler is built from the extended syllabus on disk.
+    # command's handler is built from the extended syllabus on disk. Its
+    # record is read so the new concepts are judged against what it changed.
+    store = _store()
+    pending = _load_pending_or_exit(pending_path(store.data_dir, goal))
     try:
-        added = _store().extend_syllabus(goal, from_file)
+        added = store.extend_syllabus(
+            goal, from_file, pending.record.concepts if pending else None
+        )
     except StoreError as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1)
