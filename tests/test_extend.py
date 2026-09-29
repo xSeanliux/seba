@@ -131,6 +131,16 @@ def test_file_without_concepts_is_refused_naming_it(tmp_path, content):
     assert _syllabus_bytes(data) == before
 
 
+def test_no_concepts_says_what_is_expected(tmp_path):
+    store = _seed(tmp_path / "data")
+    with pytest.raises(StoreError) as e:
+        store.extend_syllabus("prob", _file(tmp_path, "goal: g\nsubject: s\n"))
+    assert str(e.value) == (
+        "more.yaml: holds no concepts — expected a list of concepts, "
+        "or a mapping with a 'concepts:' list"
+    )
+
+
 def test_both_file_shapes_are_accepted(tmp_path):
     store = _seed(tmp_path / "data")
     whole = {
@@ -223,3 +233,98 @@ def test_extend_during_a_session(monkeypatch, tmp_path):
     state = Store(data).load_goal("prob")
     assert [c.id for c in state.syllabus.concepts] == ["bayes", "odds"]
     assert [i.concept for i in state.items] == ["odds"]
+
+
+# ---- a new concept on a dropped one ----
+
+
+def _seed_with(data, **status):
+    """bayes and odds, with the statuses given (a dropped one from unseen)."""
+    store = Store(data)
+    concepts = [
+        Concept(
+            id=cid,
+            name=cid,
+            status=status.get(cid, "unseen"),
+            dropped_from="unseen" if status.get(cid) == "dropped" else None,
+        )
+        for cid in ("bayes", "odds")
+    ]
+    syllabus = Syllabus(goal="prob", subject="probability", concepts=concepts)
+    store.create_goal("prob", syllabus, "probability")
+    return store
+
+
+LOGODDS = [{"id": "logodds", "name": "Log odds", "prereqs": ["odds"]}]
+
+
+def test_a_new_concept_on_a_dropped_one_is_refused(tmp_path):
+    data = tmp_path / "data"
+    store = _seed_with(data, bayes="dropped", odds="dropped")
+    before, commits = _syllabus_bytes(data), _commit_count(data)
+    both = [{"id": "x", "name": "X", "prereqs": ["bayes", "odds"]}]
+    with pytest.raises(StoreError) as e:
+        store.extend_syllabus("prob", _file(tmp_path, both))
+    assert str(e.value) == (
+        "more.yaml: new concept 'x' depends on bayes, odds, which is dropped — "
+        "restore that first"
+    )
+    assert _syllabus_bytes(data) == before
+    assert _commit_count(data) == commits
+
+
+def test_a_drop_in_this_session_refuses_a_new_dependent(monkeypatch, tmp_path):
+    data = _env(monkeypatch, tmp_path)
+    _seed_with(data)
+    assert runner.invoke(app, ["start", "prob"]).exit_code == 0
+    drop = ["concept", "prob", "odds", "--status", "dropped"]
+    assert runner.invoke(app, drop).exit_code == 0
+    before, commits = _syllabus_bytes(data), _commit_count(data)
+
+    path = _file(tmp_path, LOGODDS)
+    result = runner.invoke(app, ["extend", "prob", "--from-file", str(path)])
+    assert result.exit_code == 1
+    assert result.output == (
+        "more.yaml: new concept 'logodds' depends on odds, which is dropped — "
+        "restore that first\n"
+    )
+    assert _syllabus_bytes(data) == before
+    assert _commit_count(data) == commits
+
+    result = runner.invoke(app, ["end", "prob", "--summary", "s", "--hint", "h"])
+    assert result.exit_code == 0, result.output
+    s = Store(data).load_goal("prob").syllabus
+    assert [(c.id, c.status) for c in s.concepts] == [
+        ("bayes", Status.UNSEEN),
+        ("odds", Status.DROPPED),
+    ]
+
+
+def test_a_restore_in_this_session_allows_a_new_dependent(monkeypatch, tmp_path):
+    data = _env(monkeypatch, tmp_path)
+    _seed_with(data, odds="dropped")
+    assert runner.invoke(app, ["start", "prob"]).exit_code == 0
+    restore = ["concept", "prob", "odds", "--status", "restored"]
+    assert runner.invoke(app, restore).exit_code == 0
+
+    path = _file(tmp_path, LOGODDS)
+    result = runner.invoke(app, ["extend", "prob", "--from-file", str(path)])
+    assert result.exit_code == 0, result.output
+    # Only the new concept is written; the restore waits for `seba end`.
+    s = Store(data).load_goal("prob").syllabus
+    assert [(c.id, c.status) for c in s.concepts] == [
+        ("bayes", Status.UNSEEN),
+        ("odds", Status.DROPPED),
+        ("logodds", Status.UNSEEN),
+    ]
+
+
+def test_a_malformed_pending_session_is_a_clean_refusal(monkeypatch, tmp_path):
+    data = _env(monkeypatch, tmp_path)
+    _seed(data)
+    (data / "goals" / "prob" / "session.pending.yaml").write_text("agenda: [\n")
+    path = _file(tmp_path, [{"id": "odds", "name": "Odds"}])
+    result = runner.invoke(app, ["extend", "prob", "--from-file", str(path)])
+    assert result.exit_code == 1
+    assert result.output.startswith("session.pending.yaml: ")
+    assert result.exception is None or isinstance(result.exception, SystemExit)

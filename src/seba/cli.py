@@ -94,9 +94,14 @@ def extend_cmd(
     ),
 ):
     # Never touches the pending session: its agenda stands, and the next
-    # command's handler is built from the extended syllabus on disk.
+    # command's handler is built from the extended syllabus on disk. Its
+    # record is read so the new concepts are judged against what it changed.
+    store = _store()
+    pending = _load_pending_or_exit(pending_path(store.data_dir, goal))
     try:
-        added = _store().extend_syllabus(goal, from_file)
+        added = store.extend_syllabus(
+            goal, from_file, pending.record.concepts if pending else None
+        )
     except StoreError as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1)
@@ -381,7 +386,8 @@ def tune(
         )
         return
     if direction is not None:
-        direction = direction.strip()
+        # One line: a newline would put a line of its own into the briefing.
+        direction = " ".join(direction.split())
         if not direction:
             raise _refuse("--direction needs text")
 
@@ -423,7 +429,9 @@ def tune(
             line += f" ({len(mine)} card{'' if len(mine) == 1 else 's'} due now)"
         if was != emphasis or emphasis == "more":
             said.append(line)
-    if direction == state.direction:
+    # Against what goal.yaml holds, not the loaded direction: that falls back
+    # to the syllabus's goal line, and a stated direction is still recorded.
+    if direction == store.stored_direction(goal):
         direction = None  # already what the goal is for; leave goal.yaml alone
     if direction is not None:
         said.append(f'direction: "{state.direction}" → "{direction}"')

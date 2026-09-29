@@ -17,7 +17,9 @@ from seba.models import (
     Item,
     SessionRecord,
     Syllabus,
+    UpdateConcept,
 )
+from seba.scheduler.apply import replay
 from seba.syllabus.graph import SyllabusError, extend, load_concepts, load_syllabus
 
 
@@ -58,6 +60,11 @@ class Store:
             ["git", *args], cwd=self.data_dir, check=True, capture_output=True
         )
 
+    def _commit(self, message: str, *paths: str) -> None:
+        """Commit only `paths`, whatever else is staged. Fails, as an empty
+        commit does, if none of them has a change."""
+        self._git("commit", "-m", message, "--", *paths)
+
     def _goal_dir(self, name: str) -> Path:
         return self.data_dir / "goals" / name
 
@@ -75,22 +82,28 @@ class Store:
         self._git("add", "-A")
         self._git("commit", "-m", f"{name}: created")
 
-    def extend_syllabus(self, name: str, path: Path) -> list[str]:
+    def extend_syllabus(
+        self, name: str, path: Path, pending: list[UpdateConcept] | None = None
+    ) -> list[str]:
         """Append the concepts in `path`; returns their ids in file order.
         Everything is checked before anything is written. Leaves any pending
-        session alone: the next command builds its handler from this file."""
+        session alone: the next command builds its handler from this file.
+        `pending` is that session's concept changes: the new concepts are
+        judged against the syllabus as they have changed it, since the
+        session's drops must still be legal when `seba end` replays them."""
         syllabus = self.load_goal(name).syllabus
         try:
             new = load_concepts(path)
         except SyllabusError as e:
             raise StoreError(str(e)) from e
         try:
-            merged = extend(syllabus, new)
+            merged = extend(syllabus, new, against=replay(syllabus, pending or []))
         except SyllabusError as e:
             raise StoreError(f"{path.name}: {e}") from e
         self._write_syllabus(self._goal_dir(name), merged)
-        self._git("add", f"goals/{name}/syllabus.yaml")
-        self._git("commit", "-m", f"{name}: extended (+{len(new)})")
+        written = f"goals/{name}/syllabus.yaml"
+        self._git("add", written)
+        self._commit(f"{name}: extended (+{len(new)})", written)
         return [c.id for c in new]
 
     def _load_items(self, path: Path) -> list[Item]:
@@ -109,6 +122,10 @@ class Store:
             return GoalMeta.model_validate(yaml.safe_load(path.read_text()))
         except (yaml.YAMLError, ValidationError) as e:
             raise StoreError(f"{path.name}: {e}") from e
+
+    def stored_direction(self, name: str) -> str | None:
+        """The direction as goal.yaml holds it, with no fallback."""
+        return self._load_meta(self._goal_dir(name) / "goal.yaml").direction
 
     def _write_items(self, gdir: Path, items: list[Item]) -> None:
         tmp = gdir / "items.jsonl.tmp"
@@ -163,7 +180,7 @@ class Store:
             return False
         if staged.returncode != 1:
             raise StoreError(f"git diff failed: {staged.stderr.decode().strip()}")
-        self._git("commit", "-m", f"{name}: tuned")
+        self._commit(f"{name}: tuned", *paths)
         return True
 
     def _outcomes_files(self, name: str) -> list[Path]:

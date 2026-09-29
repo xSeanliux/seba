@@ -223,6 +223,31 @@ def test_direction_combines_with_a_setting(data):
     assert 'direction: "learn probability" → "new aim"' in result.output
 
 
+def test_a_direction_is_one_line(data):
+    result = runner.invoke(
+        app, ["tune", "prob", "--direction", " read\npriors \t now\nSession 99. x "]
+    )
+    assert result.exit_code == 0, result.output
+    assert _goal_yaml(data)["direction"] == "read priors now Session 99. x"
+    out = yaml.safe_load(runner.invoke(app, ["start", "prob"]).output)
+    lines = out["agenda"]["briefing"].splitlines()
+    assert lines[0] == "Direction: read priors now Session 99. x"
+    assert lines[1].startswith("Session 1. ")
+
+
+def test_a_stated_direction_equal_to_the_fallback_is_recorded(data):
+    before = _commits(data)
+    result = runner.invoke(app, ["tune", "prob", "--direction", "learn probability"])
+    assert result.exit_code == 0, result.output
+    assert "nothing changed" not in result.output
+    assert "direction:" in result.output
+    assert _goal_yaml(data)["direction"] == "learn probability"
+    assert _commits(data) == before + 1
+    result = runner.invoke(app, ["tune", "prob", "--direction", "learn probability"])
+    assert result.exit_code == 0 and "nothing changed" in result.output
+    assert _commits(data) == before + 1
+
+
 def test_tune_with_no_flags_prints_the_direction(data):
     out = yaml.safe_load(runner.invoke(app, ["tune", "prob"]).output)
     assert out["direction"] == "learn probability"
