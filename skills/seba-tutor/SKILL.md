@@ -230,6 +230,8 @@ concept's repair not holding → propose re-teaching. Only on a yes:
      0.9; lower means longer intervals).
    - cards vanishing for months → `--max-interval DAYS` (default 180).
    - sessions too short or long → `--concepts-per-session N` (1–5).
+   - concepts completing too soon or too late → `--completion-passes N`: later
+     sessions in which concept's cards must pass before `completed` (default 3).
 
    **Say which setting changed and to what**, same turn. Never silently, never
    to smooth a session.
