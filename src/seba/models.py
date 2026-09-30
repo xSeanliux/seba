@@ -2,7 +2,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ItemType(StrEnum):
@@ -46,8 +46,10 @@ RETENTION_MAX = 0.97
 
 
 class Emphasis(StrEnum):
+    # A concept with no entry in goal.yaml's `emphasis:` map is NORMAL.
     LESS = "less"
-    MORE = "more"  # normal is the absence of an entry
+    NORMAL = "normal"
+    MORE = "more"
 
 
 class GoalSettings(BaseModel):
@@ -66,15 +68,6 @@ class GoalMeta(BaseModel):
     subject: str
     settings: GoalSettings = Field(default_factory=GoalSettings)
     emphasis: dict[str, Emphasis] = Field(default_factory=dict)
-
-    @field_validator("emphasis", mode="before")
-    @classmethod
-    def _normal_is_no_entry(cls, v: dict[str, str] | str) -> dict[str, str] | str:
-        # `normal` is a level `tune` accepts, so a hand edit may write it; it
-        # means no entry. Anything malformed is left to the field's validation.
-        if isinstance(v, dict):
-            return {cid: e for cid, e in v.items() if e != "normal"}
-        return v
 
 
 class Concept(BaseModel):

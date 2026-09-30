@@ -325,7 +325,11 @@ def tune(
             yaml.safe_dump(
                 {
                     "settings": state.settings.model_dump(mode="json"),
-                    "emphasis": {c: str(e) for c, e in state.emphasis.items()},
+                    "emphasis": {
+                        c: str(e)
+                        for c, e in state.emphasis.items()
+                        if e != Emphasis.NORMAL
+                    },
                 },
                 sort_keys=False,
             )
@@ -354,11 +358,8 @@ def tune(
             raise _refuse(f"unknown concept: '{concept}'")
         if emphasis not in _LEVELS:
             raise _refuse(f"--emphasis must be one of: {', '.join(_LEVELS)}")
-        was = str(levels.get(concept, "normal"))
-        if emphasis == "normal":
-            levels.pop(concept, None)
-        else:
-            levels[concept] = Emphasis(emphasis)
+        was = str(levels.get(concept, Emphasis.NORMAL))
+        levels[concept] = Emphasis(emphasis)
         line = f"emphasis [{concept}]: {was} → {emphasis}"
         if emphasis == "more":
             # The one direct override of the schedule, and only because the

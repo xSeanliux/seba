@@ -372,10 +372,10 @@ def test_emphasis_lines(tmp_path):
     s = trouble_state(emphasis={"b": Emphasis.MORE, "a": Emphasis.LESS})
     briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
     assert "emphasis: [a] less" in briefing and "emphasis: [b] more" in briefing
-    assert (
-        "emphasis:"
-        not in build_agenda(trouble_state(), profile(), TODAY, tmp_path).briefing
-    )
+    for quiet in (trouble_state(), trouble_state(emphasis={"a": Emphasis.NORMAL})):
+        assert (
+            "emphasis:" not in build_agenda(quiet, profile(), TODAY, tmp_path).briefing
+        )
 
 
 def test_concepts_per_session_lists_up_to_that_many(tmp_path):

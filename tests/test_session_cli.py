@@ -500,8 +500,10 @@ def test_emphasis_less_and_normal_leave_due_dates_alone(monkeypatch, tmp_path):
         app, ["tune", "prob", "--concept", "bayes", "--emphasis", "normal"]
     )
     assert "emphasis [bayes]: less → normal" in result.output
-    assert store.load_goal("prob").emphasis == {}
-    assert _goal_yaml(data)["emphasis"] == {}
+    assert store.load_goal("prob").emphasis == {"bayes": "normal"}
+    assert _goal_yaml(data)["emphasis"] == {"bayes": "normal"}
+    shown = yaml.safe_load(runner.invoke(app, ["tune", "prob"]).output)
+    assert shown["emphasis"] == {}  # the default goes unsaid
 
 
 def test_tune_with_nothing_to_change_does_not_commit(monkeypatch, tmp_path):

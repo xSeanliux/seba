@@ -21,12 +21,12 @@ _RATING = {
     "good": Rating.Good,
     "easy": Rating.Easy,
 }
-_SHIFT = {Emphasis.MORE: 0.05, Emphasis.LESS: -0.10}
+_SHIFT = {Emphasis.MORE: 0.05, Emphasis.NORMAL: 0.0, Emphasis.LESS: -0.10}
 
 
-def target_retention(settings: GoalSettings, emphasis: Emphasis | None) -> float:
-    shift = _SHIFT[emphasis] if emphasis is not None else 0.0
-    return min(RETENTION_MAX, max(RETENTION_MIN, settings.desired_retention + shift))
+def target_retention(settings: GoalSettings, emphasis: Emphasis) -> float:
+    target = settings.desired_retention + _SHIFT[emphasis]
+    return min(RETENTION_MAX, max(RETENTION_MIN, target))
 
 
 def due_items(items: list[Item], today: date, limit: int) -> list[Item]:
@@ -45,7 +45,7 @@ def apply_review(
     grade: Grade,
     now: datetime,
     settings: GoalSettings,
-    emphasis: Emphasis | None,
+    emphasis: Emphasis,
 ) -> Item:
     if grade == "skipped":
         return item
