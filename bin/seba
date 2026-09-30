@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# The `seba` CLI as the Claude Code plugin ships it. Claude Code puts the
+# plugin's bin/ on the Bash tool's PATH, so the skill's bare `seba …` lands here
+# and runs the bundled package through uv. The first call builds the venv; later
+# calls are uv's quick up-to-date check. Requires uv.
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# The venv lives in the plugin's data directory, which survives updates. Claude
+# Code does not export CLAUDE_PLUGIN_DATA to the Bash tool, so derive it from
+# the install layout: <plugins>/cache/<marketplace>/<plugin>/<version>/ is this
+# plugin's root, and its data dir is <plugins>/data/<plugin>-<marketplace>/.
+if [[ -z "${CLAUDE_PLUGIN_DATA:-}" ]]; then
+  plugin="$(basename "$(dirname "$root")")"
+  marketplace="$(basename "$(dirname "$(dirname "$root")")")"
+  cache="$(dirname "$(dirname "$(dirname "$root")")")"
+  if [[ "$(basename "$cache")" == cache ]]; then
+    id="$plugin-$marketplace"
+    CLAUDE_PLUGIN_DATA="$(dirname "$cache")/data/${id//[^A-Za-z0-9_-]/-}"
+  fi
+fi
+# Not installed from a marketplace (a checkout, --plugin-dir): uv uses the
+# checkout's own .venv.
+if [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
+  mkdir -p "$CLAUDE_PLUGIN_DATA"
+  export UV_PROJECT_ENVIRONMENT="$CLAUDE_PLUGIN_DATA/venv"
+fi
+
+# --project runs the bundle from any working directory (paths the skill passes
+# stay relative to it); --frozen never rewrites the bundled uv.lock; --no-dev
+# leaves the test and lint tools out.
+exec uv run --project "$root" --frozen --no-dev --quiet seba "$@"

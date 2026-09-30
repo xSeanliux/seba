@@ -1,0 +1,9 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "seba",
+  "description": "Seba, a long-term personal tutor conducted by Claude Code.",
+  "owner": { "name": "Sean Liu", "url": "https://github.com/xSeanliux" },
+  "plugins": [
+    { "name": "seba", "source": "./", "category": "education" }
+  ]
+}
