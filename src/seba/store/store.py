@@ -100,11 +100,15 @@ class Store:
             merged = extend(syllabus, new, against=replay(syllabus, pending or []))
         except SyllabusError as e:
             raise StoreError(f"{path.name}: {e}") from e
-        self._write_syllabus(self._goal_dir(name), merged)
+        self.commit_syllabus(name, merged, f"{name}: extended (+{len(new)})")
+        return [c.id for c in new]
+
+    def commit_syllabus(self, name: str, syllabus: Syllabus, message: str) -> None:
+        """Write an already-validated syllabus and commit that one file."""
+        self._write_syllabus(self._goal_dir(name), syllabus)
         written = f"goals/{name}/syllabus.yaml"
         self._git("add", written)
-        self._commit(f"{name}: extended (+{len(new)})", written)
-        return [c.id for c in new]
+        self._commit(message, written)
 
     def _load_items(self, path: Path) -> list[Item]:
         items = []

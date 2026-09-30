@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 import typer
 import yaml
@@ -26,7 +27,7 @@ from seba.session.pending import (
 )
 from seba.session.tools import ToolHandler
 from seba.store.store import Store, StoreError
-from seba.syllabus.graph import SyllabusError, frontier, load_syllabus
+from seba.syllabus.graph import SyllabusError, edit, frontier, load_syllabus
 from seba.ui import repl
 from seba.ui.view import build_view_data, render_view
 
@@ -106,6 +107,74 @@ def extend_cmd(
         typer.echo(str(e), err=True)
         raise typer.Exit(1)
     typer.echo(f"added {len(added)} concept(s): {', '.join(added)}")
+
+
+_EDIT_FLAGS = "--name, --add-prereq, --remove-prereq, --add-source or --status"
+_EDIT_STATUS: dict[str, Literal["dropped", "restored"]] = {
+    "dropped": "dropped",
+    "restored": "restored",
+}
+
+
+@app.command("edit")
+def edit_cmd(
+    goal: str,
+    concept_id: str,
+    name: str | None = typer.Option(None, "--name", help="the concept's new name"),
+    add_prereq: list[str] | None = typer.Option(
+        None, "--add-prereq", help="a hard prerequisite to add; repeatable"
+    ),
+    remove_prereq: list[str] | None = typer.Option(
+        None, "--remove-prereq", help="a hard prerequisite to remove; repeatable"
+    ),
+    add_source: list[str] | None = typer.Option(
+        None, "--add-source", help="a locator to add to its sources; repeatable"
+    ),
+    status: str | None = typer.Option(None, "--status", help="dropped|restored"),
+):
+    """Change one concept between sessions; written and committed at once."""
+    store = _store()
+    # A pending record and a direct edit must not disagree about the syllabus:
+    # `seba end` replays the record onto whatever is on disk.
+    if _load_pending_or_exit(pending_path(store.data_dir, goal)) is not None:
+        raise _refuse(
+            f"a session is in progress for '{goal}' — end or abandon it before "
+            "editing the syllabus"
+        )
+    state = _load_goal(store, goal)
+    if not (name is not None or add_prereq or remove_prereq or add_source or status):
+        raise _refuse(f"nothing to edit — give {_EDIT_FLAGS}")
+    if name is not None:
+        name = " ".join(name.split())  # one line, as `seba concepts` prints it
+        if not name:
+            raise _refuse("--name needs text")
+    if status is not None and status not in _EDIT_STATUS:
+        raise _refuse("--status must be dropped or restored")
+    try:
+        edited = edit(
+            state.syllabus,
+            concept_id,
+            name=name,
+            add_prereqs=add_prereq,
+            remove_prereqs=remove_prereq,
+            add_sources=add_source,
+            status=_EDIT_STATUS.get(status or ""),
+        )
+    except SyllabusError as e:
+        raise _refuse(str(e))
+    [was] = [c for c in state.syllabus.concepts if c.id == concept_id]
+    [now] = [c for c in edited.concepts if c.id == concept_id]
+    said = [f'name: "{was.name}" → "{now.name}"'] if was.name != now.name else []
+    said += [f"prereq added: {p}" for p in now.prereqs if p not in was.prereqs]
+    said += [f"prereq removed: {p}" for p in was.prereqs if p not in now.prereqs]
+    said += [f"source added: {s}" for s in now.sources if s not in was.sources]
+    if was.status != now.status:
+        said.append(f"status: {was.status} → {now.status}")
+    if not said:
+        typer.echo("nothing changed")
+        return
+    store.commit_syllabus(goal, edited, f"{goal}: edited {concept_id}")
+    typer.echo("\n".join(said))
 
 
 @app.command()
