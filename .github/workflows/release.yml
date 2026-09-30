@@ -50,5 +50,7 @@ jobs:
           # A push made with GITHUB_TOKEN starts no other workflow run, so CI
           # does not run again on this commit. That is fine: CI already passed
           # on the pull request, and this commit only changes the version.
-          git push origin HEAD:main "v$version"
+          # --atomic: if main moved since checkout, reject the tag too, so no tag
+          # lands on a commit that never reached main.
+          git push --atomic origin HEAD:main "v$version"
           gh release create "v$version" --generate-notes --title "v$version"
