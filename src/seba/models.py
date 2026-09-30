@@ -56,7 +56,10 @@ class GoalSettings(BaseModel):
     desired_retention: float = Field(0.9, ge=RETENTION_MIN, le=RETENTION_MAX)
     max_interval_days: int = Field(180, ge=1)
     concepts_per_session: int = Field(1, ge=1, le=5)
-    completion_passes: int = Field(1, ge=1)
+    # Distinct later sessions in which one of the concept's cards came back
+    # `good` or `easy`, needed before `completed` is allowed. Per session, not
+    # per card: two good cards in one session are one pass.
+    completion_passes: int = Field(3, ge=1)
 
 
 class GoalMeta(BaseModel):
