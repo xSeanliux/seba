@@ -7,7 +7,7 @@ restoring and `--add-source` apply from next session.
 ## Mapping a new source
 
 1. Skim only its abstract and headings. **Never load the whole of it.**
-2. Draft concepts with learner, reusing existing ids (`seba view GOAL --json`):
+2. Draft concepts with learner, reusing existing ids (`seba concepts GOAL`):
    - One to three per source, each a session or two, named by what learner
      could explain without the source. Never carved by section.
    - Assumed background becomes its own concept and a hard prerequisite
@@ -39,9 +39,11 @@ history; `--status restored` undoes that.
 
 ## Steering
 
-Learner asks for a concept: `seba start GOAL --concept ID`. On any refusal but
+Learner asks for a concept: `seba start GOAL --concept ID` (ids from
+`seba concepts GOAL`). On any refusal but
 the last, run `seba start GOAL` and say what stood in the way.
-- `not ready: …` — offer first ready one of those, or ask.
+- `not ready: …` — offer first ready one of those (in progress, or on
+  `frontier:` line of `seba concepts GOAL`), or ask.
 - `is dropped` / `is done` — restoring or reopening is a separate decision.
 - `a session is already in progress …`:
   - **Nothing recorded** — only when all of these hold: `already_graded` is
@@ -64,7 +66,7 @@ Steered session is ordinary, whatever the day.
 ## When the direction changes
 
 Record it in one line, in their words: `seba tune GOAL --direction TEXT`. Then
-propose dropping unseen concepts **one at a time**, each with its reason,
+propose dropping unseen concepts (`seba concepts GOAL`) **one at a time**, each with its reason,
 starting with those nothing depends on. Map any missing material.
 
 ## Running out

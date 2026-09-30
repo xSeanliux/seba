@@ -84,6 +84,7 @@ is the exception).
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session |
 | `seba abandon GOAL [--discard]` | quit early: save as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a drafted syllabus YAML |
+| `seba concepts GOAL [--grep TEXT]` | list the goal's concepts, one per line: id, status, name, hard prereqs; the direction before, `frontier:` after. `--grep` keeps concepts whose id or name contains TEXT (case-insensitive). Writes nothing |
 | `seba view GOAL [--json] [--open]` | render the goal's dependency graph + card status to HTML; `--json` prints the data blob instead, `--open` shows it in the browser |
 
 ## Data directory layout

@@ -26,7 +26,7 @@ from seba.session.pending import (
 )
 from seba.session.tools import ToolHandler
 from seba.store.store import Store, StoreError
-from seba.syllabus.graph import SyllabusError, load_syllabus
+from seba.syllabus.graph import SyllabusError, frontier, load_syllabus
 from seba.ui import repl
 from seba.ui.view import build_view_data, render_view
 
@@ -332,6 +332,36 @@ def view(
     typer.echo(str(out))
     if open_browser:
         typer.launch(str(out))
+
+
+@app.command()
+def concepts(
+    goal: str,
+    grep: str | None = typer.Option(
+        None, "--grep", help="only concepts whose id or name contains TEXT"
+    ),
+):
+    """List the goal's concepts: id, status, name; then the frontier."""
+    state = _load_goal(_store(), goal)
+    shown = [
+        c
+        for c in state.syllabus.concepts
+        if grep is None or grep.casefold() in f"{c.id}\n{c.name}".casefold()
+    ]
+    if not shown:
+        return  # --grep matched nothing
+    id_w = max(len(c.id) for c in shown)
+    status_w = max(len(c.status) for c in shown)
+    typer.echo(f"direction: {state.direction}")
+    for c in shown:
+        line = f"{c.id:<{id_w}}  {c.status:<{status_w}}  {c.name}"
+        if c.prereqs:
+            line += f"  prereqs: {', '.join(c.prereqs)}"
+        if c.dropped_from is not None:
+            line += f"  dropped from: {c.dropped_from}"
+        typer.echo(line)
+    ready = [c.id for c in frontier(state.syllabus)]
+    typer.echo(f"frontier: {', '.join(ready) or 'none'}")
 
 
 _FLAG = {
