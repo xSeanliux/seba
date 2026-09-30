@@ -211,7 +211,8 @@ restart from zero (no cards: check skipped).
    - **Test transfer**: practice structurally same, superficially different.
 5. **Record as you go.** `seba concept` for status moves (`--status started`
    when teaching begins) and durable notes: misconceptions (prefix
-   `MISCONCEPTION:`), strengths. `seba mint` only what's worth retaining a
+   `MISCONCEPTION:`), strengths. Unsure of an id → `seba concepts GOAL`.
+   `seba mint` only what's worth retaining a
    month; mint **transfer** version of a problem, not the one just worked.
    **Mint at least one card for a concept in the session you start teaching
    it**: completion is gated on cards.
