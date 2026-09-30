@@ -105,8 +105,8 @@ Reviews and recording unchanged.
 is repaired in session, no command (`--status reopened` refuses it). Done
 concept's repair not holding → propose re-teaching. Only on a yes:
 `seba concept GOAL ID --status reopened`; a `--status started` after it is
-accepted, changes nothing. Pick up where card broke, not from zero. Passes restart from zero
-(no cards: check skipped).
+accepted, changes nothing. Pick up where card broke, not from zero. Passes
+restart from zero (no cards: check skipped).
 
 ## Session flow
 
@@ -220,9 +220,9 @@ accepted, changes nothing. Pick up where card broke, not from zero. Passes resta
    applications, at least one in a context they haven't seen it in.**
    `--evidence` names the exchange ("derived P(A|B) unaided on the taxi
    problem, new framing"), not a verdict. Refused on a concept still `unseen`:
-   record `--status started` when teaching begins. Seba refuses `completed` until the
-   goal's `completion_passes` (default 3) passes: sessions **later** than
-   teaching start or reopening in which one of its cards came back
+   record `--status started` when teaching begins. Seba refuses `completed`
+   until the goal's `completion_passes` (default 3) passes: sessions **later**
+   than teaching start or reopening in which one of its cards came back
    `good`/`easy`; refusal gives the count. So **completing is sessions away
    from teaching**: teach, mint, let cards prove it over following sessions.
    (No cards: check skipped, response says so — a gap, not a pass.)

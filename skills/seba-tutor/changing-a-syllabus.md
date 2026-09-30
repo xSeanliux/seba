@@ -14,9 +14,9 @@ restoring and `--add-source` apply from next session.
      (`prereqs`) of what needs it; `done` if learner has it, otherwise a gap
      to teach.
    - A source is never a concept: it goes, as slices, in `sources`.
-3. **Save only after an explicit yes:** `concepts:` list (new-goal schema in
-   `SKILL.md`, each `unseen` or `done`) in a temp file, then
-   `seba extend GOAL --from-file PATH`.
+3. **Save only after an explicit yes:** `concepts:` list (schema under
+   Creating a new goal in `SKILL.md`, each `unseen` or `done`) in a temp file,
+   then `seba extend GOAL --from-file PATH`.
 4. Existing concept the source also teaches:
    `seba concept GOAL ID --add-source LOCATOR`, one slice per call.
 
@@ -67,7 +67,8 @@ Steered session is ordinary, whatever the day.
 
 Record it in one line, in their words: `seba tune GOAL --direction TEXT`. Then
 propose dropping unseen concepts (`seba concepts GOAL`) **one at a time**,
-each with its reason, starting with those nothing depends on. Map any missing material.
+each with its reason, starting with those nothing depends on. Map any missing
+material.
 
 ## Running out
 
