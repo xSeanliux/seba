@@ -608,3 +608,86 @@ def test_a_valid_setting_with_a_bad_emphasis_writes_nothing(
     assert (gdir / "goal.yaml").read_text() == goal_yaml
     assert (gdir / "items.jsonl").read_text() == items
     assert _commit_count(data) == before
+
+
+def _seed_concepts(data):
+    Store(data).create_goal(
+        "prob",
+        Syllabus(
+            goal="learn probability",
+            subject="probability",
+            concepts=[
+                Concept(id="counting", name="Counting", status=Status.DONE),
+                Concept(
+                    id="bayes",
+                    name="Bayes' Theorem",
+                    prereqs=["counting"],
+                    status=Status.IN_PROGRESS,
+                ),
+                Concept(
+                    id="martingales",
+                    name="Martingales",
+                    status=Status.DROPPED,
+                    dropped_from=Status.UNSEEN,
+                ),
+                Concept(id="priors", name="Choosing Priors", prereqs=["bayes"]),
+                Concept(id="sets", name="Set Algebra"),
+            ],
+        ),
+        "probability",
+    )
+
+
+def test_concepts_lists_the_syllabus_in_order(monkeypatch, tmp_path):
+    data = env(monkeypatch, tmp_path)
+    _seed_concepts(data)
+    before = _commit_count(data)
+    result = runner.invoke(app, ["concepts", "prob"])
+    assert result.exit_code == 0, result.output
+    assert result.output == (
+        "direction: learn probability\n"
+        "counting     done         Counting\n"
+        "bayes        in-progress  Bayes' Theorem  prereqs: counting\n"
+        "martingales  dropped      Martingales  dropped from: unseen\n"
+        "priors       unseen       Choosing Priors  prereqs: bayes\n"
+        "sets         unseen       Set Algebra\n"
+        "frontier: bayes, sets\n"
+    )
+    assert _commit_count(data) == before
+
+
+@pytest.mark.parametrize(
+    "text,ids",
+    [("bayes", ["bayes"]), ("PRIOR", ["priors"]), ("algebra", ["sets"])],
+)
+def test_concepts_grep_matches_id_or_name_ignoring_case(
+    monkeypatch, tmp_path, text, ids
+):
+    _seed_concepts(env(monkeypatch, tmp_path))
+    result = runner.invoke(app, ["concepts", "prob", "--grep", text])
+    assert result.exit_code == 0, result.output
+    lines = result.output.splitlines()
+    assert lines[0] == "direction: learn probability"
+    assert [ln.split()[0] for ln in lines[1:-1]] == ids
+    assert lines[-1] == "frontier: bayes, sets"
+
+
+def test_concepts_grep_with_no_match_prints_nothing(monkeypatch, tmp_path):
+    _seed_concepts(env(monkeypatch, tmp_path))
+    result = runner.invoke(app, ["concepts", "prob", "--grep", "topology"])
+    assert result.exit_code == 0 and result.output == ""
+
+
+def test_concepts_frontier_none(monkeypatch, tmp_path):
+    data = env(monkeypatch, tmp_path)
+    store = seed(data, with_item=False)
+    _mark_done(store)
+    result = runner.invoke(app, ["concepts", "prob"])
+    assert result.exit_code == 0
+    assert result.output.splitlines()[-1] == "frontier: none"
+
+
+def test_concepts_on_an_unknown_goal_fails_cleanly(monkeypatch, tmp_path):
+    env(monkeypatch, tmp_path)
+    result = runner.invoke(app, ["concepts", "nope"])
+    assert result.exit_code == 1 and "no such goal" in result.output
