@@ -25,6 +25,7 @@ record does not exist next session.
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session (refuses while reviews are ungraded) |
 | `seba abandon GOAL [--discard]` | learner quits early: save what was recorded as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a syllabus YAML you drafted |
+| `seba concepts GOAL [--grep TEXT]` | list the goal's concepts, one per line: id, status, name, hard prereqs; the direction before, `frontier:` after. `--grep` keeps concepts whose id or name contains TEXT (case-insensitive). Writes nothing |
 | `seba view GOAL [--json] [--open]` | render the goal's dependency graph + card status to HTML; `--json` prints the data blob instead, `--open` shows it in the browser |
 
 Any command that fails prints the reason and exits non-zero — read the message,
@@ -444,7 +445,7 @@ conversation:
 1. Skim the source's abstract and headings: the first page of a PDF, the table
    of contents, the one page a URL names. **Never load the whole of it.**
 2. Draft the concepts, and name which existing concepts the source reuses
-   (`seba view GOAL --json` lists the goal's concepts). Defaults:
+   (`seba concepts GOAL` lists the goal's concepts). Defaults:
    - One to three concepts per source, each named by what the learner could
      explain without the source in front of them.
    - Background the source assumes becomes its own concept and a hard
@@ -500,13 +501,13 @@ setting it aside, usually because the direction moved.
   refused: `'ITEM_ID' belongs to 'X', which is dropped — grade it skipped`.
 
 **Steering.** When the learner asks for a particular concept, start the session
-on it: `seba start GOAL --concept ID` (ids from `seba view GOAL --json`). It
+on it: `seba start GOAL --concept ID` (ids from `seba concepts GOAL`). It
 must be in progress or on the frontier. Any refusal but the last below starts
 no session: run `seba start GOAL` for the usual one, and tell the learner what
 stood in the way. Refusals:
 - `'X' is not ready: a, b must be done first` — hard prerequisites are the
-  curriculum. Offer the first of those that is ready (in progress, or in
-  `stats.frontier` of `seba view GOAL --json`), or ask what they want instead.
+  curriculum. Offer the first of those that is ready (in progress, or on the
+  `frontier:` line of `seba concepts GOAL`), or ask what they want instead.
 - `'X' is dropped; restore it first` or `'X' is done; reopen it if the learner
   wants it taught again` — restoring or reopening is its own decision, made in
   a session, and shows from the next.
@@ -533,7 +534,7 @@ return-after-lapse; on the latter the briefing carries an `away:` line.
 **When the direction changes.** The learner says the goal is now for something
 else. Put it in one line, a sentence or two in their words, and record it:
 `seba tune GOAL --direction TEXT`. Say what changed, as with any tuning. Then
-walk the unseen concepts with them (`seba view GOAL --json`) and propose drops
+walk the unseen concepts with them (`seba concepts GOAL`) and propose drops
 **one at a time**, each with its reason against the new direction: "martingales
 served the old aim — set it aside?" Drop only on a yes. Starting with concepts
 nothing depends on means fewer refusals. If the new direction needs material
