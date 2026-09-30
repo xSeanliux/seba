@@ -1,0 +1,54 @@
+name: Release
+
+# Every merged pull request into main is a release, sized by its label:
+# major, minor or patch (patch if none; release-label.yml requires exactly one
+# before merge). A PR labelled no-release is skipped. The version lives in
+# .claude-plugin/plugin.json, which is what Claude Code compares to decide that
+# an installed plugin has an update.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+# Two merges in quick succession release one after the other, not over each other.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      github.event.pull_request.merged == true &&
+      !contains(github.event.pull_request.labels.*.name, 'no-release')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Bump, commit, tag, release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          part=patch
+          for p in major minor; do
+            if echo "$LABELS" | jq -e --arg p "$p" 'any(.[]; . == $p)' >/dev/null; then
+              part=$p
+              break
+            fi
+          done
+          version=$(python3 scripts/bump_version.py "$part")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: release v$version"
+          git tag "v$version"
+          # A push made with GITHUB_TOKEN starts no other workflow run, so CI
+          # does not run again on this commit. That is fine: CI already passed
+          # on the pull request, and this commit only changes the version.
+          git push origin HEAD:main "v$version"
+          gh release create "v$version" --generate-notes --title "v$version"

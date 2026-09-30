@@ -1,0 +1,24 @@
+name: Release label
+
+# Every pull request into main says how it releases: exactly one of the labels
+# major, minor, patch or no-release. Make the `release-label` job a required
+# check on main for this to block a merge.
+
+on:
+  pull_request:
+    types: [opened, edited, labeled, unlabeled, synchronize, reopened]
+    branches: [main]
+
+jobs:
+  release-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Exactly one release label
+        run: |
+          n=$(jq '[.pull_request.labels[].name
+                   | select(. == "major" or . == "minor" or . == "patch" or . == "no-release")]
+                  | length' "$GITHUB_EVENT_PATH")
+          if [ "$n" -ne 1 ]; then
+            echo "::error::This pull request has $n release labels; it needs exactly one of: major, minor, patch, no-release."
+            exit 1
+          fi
