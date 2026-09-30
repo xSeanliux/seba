@@ -501,8 +501,8 @@ setting it aside, usually because the direction moved.
 
 **Steering.** When the learner asks for a particular concept, start the session
 on it: `seba start GOAL --concept ID` (ids from `seba view GOAL --json`). It
-must be in progress or on the frontier. A refused `--concept` starts no
-session: run `seba start GOAL` for the usual one, and tell the learner what
+must be in progress or on the frontier. Any refusal but the last below starts
+no session: run `seba start GOAL` for the usual one, and tell the learner what
 stood in the way. Refusals:
 - `'X' is not ready: a, b must be done first` — hard prerequisites are the
   curriculum. Offer the first of those that is ready (in progress, or in
@@ -513,10 +513,9 @@ stood in the way. Refusals:
 - `a session is already in progress for 'GOAL' — end or abandon it before
   choosing a concept` — steering happens before a session starts. Asked
   after `seba start`:
-  - **Nothing recorded** — only when all of these hold: `seba start` did not
-    print `(resuming session in progress)`; `already_graded` is empty;
-    `minted_so_far` and `concept_calls_so_far` are both 0; and you have run no
-    `seba grade`, `seba mint` or `seba concept` since. Then a discard loses
+  - **Nothing recorded** — only when all of these hold: `already_graded` is
+    empty; `minted_so_far` and `concept_calls_so_far` are both 0; and you have
+    run no `seba grade`, `seba mint` or `seba concept` since. Then a discard loses
     nothing: `seba abandon GOAL --discard`, then `seba start GOAL --concept ID`.
   - **Otherwise** — never discard: it throws away the recorded grades, cards
     and concept calls, a resumed session's too. Teach what the agenda holds.
