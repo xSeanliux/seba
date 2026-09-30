@@ -66,7 +66,7 @@ class GoalSettings(BaseModel):
     # last reopened, in which one of its cards came back `good` or `easy`,
     # needed before `completed` is allowed. Per session, not
     # per card: two good cards in one session are one pass.
-    completion_passes: int = Field(3, ge=1)
+    completion_passes: int = Field(1, ge=1)
 
 
 class GoalMeta(BaseModel):

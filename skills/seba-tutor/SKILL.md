@@ -221,10 +221,10 @@ restart from zero (no cards: check skipped).
    `--evidence` names the exchange ("derived P(A|B) unaided on the taxi
    problem, new framing"), not a verdict. Refused on a concept still `unseen`:
    record `--status started` when teaching begins. Seba refuses `completed`
-   until the goal's `completion_passes` (default 3) passes: sessions **later**
+   until the goal's `completion_passes` (default 1) passes: sessions **later**
    than teaching start or reopening in which one of its cards came back
-   `good`/`easy`; refusal gives the count. So **completing is sessions away
-   from teaching**: teach, mint, let cards prove it over following sessions.
+   `good`/`easy`; refusal gives the count. So **completing is a later-session
+   event**: teach, mint, let a card prove it next time.
    (No cards: check skipped, response says so — a gap, not a pass.)
 6. Tangents welcome; record anything durable.
 7. **Close on a success.** Last practice item failed → pose one they can clear,
@@ -244,7 +244,7 @@ restart from zero (no cards: check skipped).
    - cards vanishing for months → `--max-interval DAYS` (default 180).
    - sessions too short or long → `--concepts-per-session N` (1–5).
    - concepts completing too soon or too late → `--completion-passes N`: later
-     sessions in which concept's cards must pass before `completed` (default 3).
+     sessions in which concept's cards must pass before `completed` (default 1).
 
    **Say which setting changed and to what**, same turn. Never silently, never
    to smooth a session.
