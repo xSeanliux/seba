@@ -33,7 +33,8 @@ learner wants it.
 `--status dropped` stops teaching and reviewing a concept, keeping its
 history; `--status restored` undoes that.
 - `cannot drop …` — tell learner what depends on it, ask; on a yes, drop those
-  first. Never edit an edge by hand to get a drop through.
+  first. Remove the edge in `syllabus.yaml` by hand only if learner agrees the
+  dependency is wrong.
 - `… depends on P, which is dropped …` — ask about restoring P.
 - Review card whose concept was dropped this session: grade it `skipped`.
 
