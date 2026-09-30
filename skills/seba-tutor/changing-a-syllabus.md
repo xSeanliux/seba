@@ -40,8 +40,8 @@ history; `--status restored` undoes that.
 ## Steering
 
 Learner asks for a concept: `seba start GOAL --concept ID` (ids from
-`seba concepts GOAL`). On any refusal but
-the last, run `seba start GOAL` and say what stood in the way.
+`seba concepts GOAL`). On any refusal but the last, run `seba start GOAL` and
+say what stood in the way.
 - `not ready: …` — offer first ready one of those (in progress, or on
   `frontier:` line of `seba concepts GOAL`), or ask.
 - `is dropped` / `is done` — restoring or reopening is a separate decision.
@@ -66,8 +66,8 @@ Steered session is ordinary, whatever the day.
 ## When the direction changes
 
 Record it in one line, in their words: `seba tune GOAL --direction TEXT`. Then
-propose dropping unseen concepts (`seba concepts GOAL`) **one at a time**, each with its reason,
-starting with those nothing depends on. Map any missing material.
+propose dropping unseen concepts (`seba concepts GOAL`) **one at a time**,
+each with its reason, starting with those nothing depends on. Map any missing material.
 
 ## Running out
 

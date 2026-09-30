@@ -24,7 +24,7 @@ next session.
 | `seba end GOAL --summary TEXT --hint TEXT` | close session (refuses while reviews ungraded) |
 | `seba abandon GOAL [--discard]` | learner quits early: save what was recorded as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create goal from syllabus YAML you drafted |
-| `seba concepts GOAL [--grep TEXT]` | list the goal's concepts, one per line: id, status, name, hard prereqs; the direction before, `frontier:` after. `--grep` keeps concepts whose id or name contains TEXT (case-insensitive). Writes nothing |
+| `seba concepts GOAL [--grep TEXT]` | list concepts, one per line: id, status, name, hard prereqs; `direction:` line first, `frontier:` line last. `--grep`: only concepts whose id or name contains TEXT (case-insensitive). Read-only |
 | `seba view GOAL [--json] [--open]` | dependency graph + card status as HTML; `--json`: data instead; `--open`: in browser |
 
 Failed command: read message, fix call, retry. Never work around a refusal.
