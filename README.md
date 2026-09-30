@@ -36,7 +36,8 @@ That is the whole install. The plugin puts a `seba` command on the PATH of
 Claude Code's Bash tool (not your own shell's); its first run builds Seba's
 environment, which takes a few seconds.
 
-Every merge to `main` is a release with a new version. To get it, run
+Every merge to `main` is a release with a new version, except pull requests
+labelled `no-release`. To get it, run
 `claude plugin update seba@seba`, or turn on auto-update once under
 `/plugin` → Marketplaces → seba → Enable auto-update; Claude Code then updates
 in the background and asks you to `/reload-plugins`. Remove with
