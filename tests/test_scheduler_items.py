@@ -46,14 +46,16 @@ def test_mint_and_review_cycle():
         MintItem(concept="c", type="recall", front="f", back="b"), date(2026, 7, 3)
     )
     assert item.id.startswith("it-") and "due" in item.fsrs
-    graded = apply_review(item, "good", now, DEFAULTS, None)
+    graded = apply_review(item, "good", now, DEFAULTS, Emphasis.NORMAL)
     assert graded.fsrs != item.fsrs
 
 
 def test_skipped_leaves_fsrs_untouched():
     item = make_item()
     assert (
-        apply_review(item, "skipped", datetime.now(timezone.utc), DEFAULTS, None)
+        apply_review(
+            item, "skipped", datetime.now(timezone.utc), DEFAULTS, Emphasis.NORMAL
+        )
         == item
     )
 
@@ -63,7 +65,7 @@ def test_again_due_within_a_day():
     item = mint_item(
         MintItem(concept="c", type="recall", front="f", back="b"), date(2026, 7, 3)
     )
-    graded = apply_review(item, "again", now, DEFAULTS, None)
+    graded = apply_review(item, "again", now, DEFAULTS, Emphasis.NORMAL)
     due = datetime.fromisoformat(graded.fsrs["due"])
     assert due <= now + timedelta(days=1)
 
@@ -80,7 +82,7 @@ def test_thirty_day_sim_intervals_grow():
     for _ in range(6):
         due = datetime.fromisoformat(item.fsrs["due"])
         now = max(now, due) + timedelta(hours=1)
-        item = apply_review(item, "good", now, uncapped, None)
+        item = apply_review(item, "good", now, uncapped, Emphasis.NORMAL)
         intervals.append((datetime.fromisoformat(item.fsrs["due"]) - now).days)
     assert intervals == sorted(intervals) and intervals[-1] > intervals[0]
 
@@ -104,7 +106,8 @@ def no_fuzz(monkeypatch):
 @pytest.mark.parametrize(
     "settings,emphasis,expected",
     [
-        (GoalSettings(), None, 0.90),
+        (GoalSettings(), Emphasis.NORMAL, 0.90),
+        (GoalSettings(desired_retention=0.8), Emphasis.NORMAL, 0.80),
         (GoalSettings(), Emphasis.MORE, 0.95),
         (GoalSettings(), Emphasis.LESS, 0.80),
         (GoalSettings(desired_retention=0.95), Emphasis.MORE, 0.97),
@@ -116,7 +119,7 @@ def test_target_retention(settings, emphasis, expected):
 
 
 def test_hard_on_a_new_card_yields_at_least_a_day():
-    graded = apply_review(new_card(), "hard", NOW, DEFAULTS, None)
+    graded = apply_review(new_card(), "hard", NOW, DEFAULTS, Emphasis.NORMAL)
     assert days(graded, NOW) >= 1
     assert graded.fsrs["state"] == State.Review
 
@@ -125,7 +128,7 @@ def test_struggler_history_grows(no_fuzz):
     # The history that kept one card at zero days for five sessions.
     item, now, intervals = new_card(), NOW, []
     for grade in ["again", "hard", "hard", "hard", "hard", "good", "easy"]:
-        item = apply_review(item, grade, now, DEFAULTS, None)
+        item = apply_review(item, grade, now, DEFAULTS, Emphasis.NORMAL)
         intervals.append(days(item, now))
         # sessions are three days apart; a card is never reviewed before it is due
         now = max(datetime.fromisoformat(item.fsrs["due"]), now + timedelta(days=3))
@@ -137,7 +140,7 @@ def test_no_interval_exceeds_the_ceiling():
     settings = GoalSettings(max_interval_days=30)
     item, now, intervals = new_card(), NOW, []
     for _ in range(8):
-        item = apply_review(item, "easy", now, settings, None)
+        item = apply_review(item, "easy", now, settings, Emphasis.NORMAL)
         intervals.append(days(item, now))
         now = datetime.fromisoformat(item.fsrs["due"])
     # Fuzz is on and may land a day or two under the ceiling, never over it.
@@ -155,7 +158,7 @@ def test_emphasis_shifts_the_interval(no_fuzz):
         return last
 
     more, normal, less = (
-        after_three_goods(e) for e in (Emphasis.MORE, None, Emphasis.LESS)
+        after_three_goods(e) for e in (Emphasis.MORE, Emphasis.NORMAL, Emphasis.LESS)
     )
     assert more < normal < less
 
@@ -168,7 +171,7 @@ def test_a_stored_learning_card_graduates(grade):
     assert card.state == State.Learning and card.step == 0
     item = new_card().model_copy(update={"fsrs": dict(card.to_dict())})
     later = NOW + timedelta(days=3)
-    graded = apply_review(item, grade, later, DEFAULTS, None)
+    graded = apply_review(item, grade, later, DEFAULTS, Emphasis.NORMAL)
     assert graded.fsrs["state"] == State.Review and graded.fsrs["step"] is None
     assert days(graded, later) >= 1
 
@@ -185,7 +188,7 @@ def test_a_card_due_past_the_ceiling_is_capped_at_its_next_review():
         last_review=NOW.isoformat(),
     )
     item = new_card().model_copy(update={"fsrs": fsrs})
-    graded = apply_review(item, "good", due, DEFAULTS, None)
+    graded = apply_review(item, "good", due, DEFAULTS, Emphasis.NORMAL)
     assert days(graded, due) <= 180
 
 

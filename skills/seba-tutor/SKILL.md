@@ -289,7 +289,7 @@ unless it has no cards, it can't be completed in the session that reopened it.
    actual exchange ("derived P(A|B) unaided on the taxi problem, new framing"),
    not a verdict ("learner understands it"). Seba also refuses `completed` until
    the concept has as many passes as the goal's `completion_passes` (default
-   one). A pass is a session **later** than the one where teaching started or
+   3). A pass is a session **later** than the one where teaching started or
    the concept was reopened, in which one of its cards came back `good`/`easy`.
    The refusal says how many passes it has. So **completing is a later-session
    event**. Don't plan to teach and complete in one sitting: teach, mint, let
