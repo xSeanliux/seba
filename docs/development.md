@@ -85,7 +85,7 @@ These commands are **agent-facing**: Claude Code calls them, directed by the
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session |
 | `seba abandon GOAL [--discard]` | quit early: save as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a drafted syllabus YAML |
-| `seba concepts GOAL [--grep TEXT]` | list concepts, one per line: id, status, name, hard prereqs; `direction:` line first, `frontier:` line last. `--grep`: only concepts whose id or name contains TEXT (case-insensitive). Read-only |
+| `seba concepts GOAL [--grep TEXT]` | list concepts, one per line: id, status, name, hard prereqs; `direction:` line first, then `session: in progress` while a session is pending, `frontier:` line last. `--grep`: only concepts whose id or name contains TEXT (case-insensitive). Read-only |
 | `seba view GOAL [--json] [--open]` | render the goal's dependency graph + card status to HTML; `--json` prints the data blob instead, `--open` shows it in the browser |
 
 ## Data directory layout

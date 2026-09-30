@@ -13,7 +13,7 @@ changes on your judgment alone. No teaching here: that is `seba-tutor`.
 | Command | Purpose |
 |---|---|
 | `seba status` | list goals |
-| `seba concepts GOAL [--grep TEXT]` | curriculum: `direction:` line, one line per concept (id, status, name, hard prereqs), `frontier:` line |
+| `seba concepts GOAL [--grep TEXT]` | curriculum: `direction:` line, `session: in progress` if one is pending, one line per concept (id, status, name, hard prereqs), `frontier:` line |
 | `seba edit GOAL ID [--name TEXT] [--add-prereq ID] [--remove-prereq ID] [--add-source LOCATOR] [--status dropped\|restored]` | change one concept; prereq and source flags repeatable, flags combine; prints one line per change |
 | `seba extend GOAL --from-file PATH` | add concepts from a file |
 | `seba tune GOAL --direction TEXT` | restate what goal is for |
@@ -24,18 +24,16 @@ changes on your judgment alone. No teaching here: that is `seba-tutor`.
 ## Conversation
 
 1. Goal from arguments or learner; unclear → `seba status`, ask.
-2. `seba concepts GOAL`. Show the part that matters; ask what to change.
-   **One question per turn, then stop.**
+2. `seba concepts GOAL`. **Run nothing else before this check:**
+   `session: in progress` → stop; learner finishes it with the tutor skill,
+   or `seba abandon GOAL`; then resume here. Otherwise show the part that
+   matters; ask what to change. **One question per turn, then stop.**
 3. Draft exact change: every command you will run, and for new concepts the
    YAML. Show it. Ask "Apply this?" **Run nothing until an explicit yes.**
    Otherwise revise, show again.
 4. Run. Refusal → say what stood in the way, propose a fix, ask. Never work
    around a refusal.
 5. Show `seba concepts GOAL` so learner sees result.
-
-`a session is in progress for 'GOAL' — end or abandon it before editing the
-syllabus`: tell learner. Finish that session with `/seba-tutor`, or, if they
-are done with it, `seba abandon GOAL`. Then resume here.
 
 ## Adding a source (mapping)
 
@@ -94,5 +92,6 @@ with those nothing depends on. Map any missing material.
 ## By hand
 
 No command for `soft_prereqs`, `confusable_with`, `kc_type`, `est_sessions`.
-On a yes, edit `$SEBA_DATA_DIR/goals/GOAL/syllabus.yaml`, then
+On a yes, with no `session: in progress` line, edit
+`$SEBA_DATA_DIR/goals/GOAL/syllabus.yaml`, then
 `seba concepts GOAL` to check it loads. No deleting a concept: drop it.
