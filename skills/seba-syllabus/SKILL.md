@@ -65,7 +65,9 @@ are done with it, `seba abandon GOAL`. Then resume here.
 4. Existing concept the source also teaches:
    `seba edit GOAL ID --add-source LOCATOR`.
 5. Gap under an existing concept: map it as a new concept; with learner's yes,
-   `seba edit GOAL EXISTING --add-prereq NEW`.
+   `seba edit GOAL EXISTING --add-prereq NEW`. Gap is taught first: tell
+   learner to ask for NEW at next session, so tutor steers to it
+   (`seba start GOAL --concept NEW`).
 
 ## Dropping and restoring
 
