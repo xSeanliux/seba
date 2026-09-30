@@ -396,11 +396,11 @@ def test_emphasis_on_an_unknown_concept_is_ignored_at_load(store):
     assert store.load_goal("prob").emphasis == {"bayes": "less"}
 
 
-def test_emphasis_normal_in_goal_yaml_means_no_entry(store):
+def test_emphasis_normal_in_goal_yaml_loads_as_normal(store):
     store.create_goal("prob", syl(), "probability")
     path = _goal_yaml(store)
     path.write_text(path.read_text() + "emphasis:\n  bayes: normal\n")
-    assert store.load_goal("prob").emphasis == {}
+    assert store.load_goal("prob").emphasis == {"bayes": Emphasis.NORMAL}
 
 
 def _save(store, gs, *reviews):

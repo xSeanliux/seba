@@ -164,7 +164,7 @@ def _emphasis_lines(state: GoalState) -> list[str]:
         f"emphasis: [{cid}] {e} — the learner asked to see these cards "
         f"{often[e]} often."
         for cid, e in sorted(state.emphasis.items())
-        if cid not in dropped
+        if cid not in dropped and e != Emphasis.NORMAL
     ]
 
 

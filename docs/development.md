@@ -45,7 +45,9 @@ deterministic half only through the CLI, directed by the `seba-tutor` skill.
   `seba start`, and so is `seba extend`'s refusal of a new concept on a
   dropped one;
   `mint_item` is capped per session by `mint_budget`: 2 to 5, depending on
-  the subject's review capacity.
+  the subject's review capacity. It is a count of new cards, half the
+  session's review capacity, floored at 2 and capped at 5, so that new cards
+  never outrun what a session can review.
 - **Fail loudly.** A malformed state file raises an error naming the file; a
   CLI validation failure prints the reason to stderr and exits non-zero.
   Never swallow an error or silently default.
@@ -78,7 +80,7 @@ is the exception).
 | `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create a spaced-repetition card |
 | `seba concept GOAL ID [--status started\|completed\|reopened\|dropped\|restored] [--evidence TEXT] [--note TEXT] [--add-source LOCATOR]` | record concept progress, a note, or a source; `completed` requires `--evidence`; `reopened` is only for a done concept, once the learner has agreed. Drops, restores and sources are applied at `seba end` |
 | `seba extend GOAL --from-file PATH` | append concepts to the goal's syllabus; validated whole, written at once, works with or without a session pending; refuses a new concept whose hard prereq is dropped |
-| `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more] [--direction TEXT]` | no flags: print the goal's direction, settings and emphasis; with flags: change them. `--direction` is written at once. Works during a session, but the session's review list and follow-on concepts were fixed at `seba start`: emphasis `more` and `--concepts-per-session` show from the next session. Retention, the interval ceiling and emphasis take effect at each card's next review, including cards graded later in this session |
+| `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more] [--direction TEXT]` | no flags: print the goal's direction, settings and emphasis; with flags: change them. `--direction` is written at once. Works during a session, but the session's review list and follow-on concepts were fixed at `seba start`: emphasis `more` and `--concepts-per-session` show from the next session. Retention, the interval ceiling and emphasis take effect at each card's next review, including cards graded later in this session. `--retention` (default 0.9, py-fsrs's own) is bounded by design to 0.70–0.97, the limits Anki puts on FSRS desired retention: below 0.70 the learner forgets most of what they review, above 0.97 the workload grows without bound for little gain in recall. `--completion-passes` (default 3) is the number of distinct sessions, later than the one where the concept was started or reopened, in which one of its cards came back `good` or `easy`, before `completed` is allowed: a pass is per session, not per card, and `good` counts as well as `easy` |
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session |
 | `seba abandon GOAL [--discard]` | quit early: save as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a drafted syllabus YAML |

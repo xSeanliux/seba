@@ -379,7 +379,7 @@ def test_a_reopened_concept_cannot_complete_in_the_same_session(monkeypatch, tmp
     result = runner.invoke(
         app, ["concept", "prob", "bayes", "--status", "completed", "--evidence", "x"]
     )
-    assert result.exit_code == 1 and "0 of 1" in result.output
+    assert result.exit_code == 1 and "0 of 3" in result.output
 
 
 def test_completing_a_concept_never_started_is_refused(monkeypatch, tmp_path):
@@ -413,7 +413,7 @@ def test_a_concept_first_carded_this_session_cannot_complete_in_it(
     result = runner.invoke(
         app, ["concept", "prob", "bayes", "--status", "completed", "--evidence", "x"]
     )
-    assert result.exit_code == 1 and "0 of 1" in result.output
+    assert result.exit_code == 1 and "0 of 3" in result.output
 
 
 def _goal_yaml(data):
@@ -438,7 +438,7 @@ def test_tune_prints_and_writes_nothing(monkeypatch, tmp_path):
         "desired_retention": 0.9,
         "max_interval_days": 180,
         "concepts_per_session": 1,
-        "completion_passes": 1,
+        "completion_passes": 3,
     }
     assert shown["emphasis"] == {}
     assert _commit_count(data) == before and "settings" not in _goal_yaml(data)
@@ -546,8 +546,10 @@ def test_emphasis_less_and_normal_leave_due_dates_alone(monkeypatch, tmp_path):
         app, ["tune", "prob", "--concept", "bayes", "--emphasis", "normal"]
     )
     assert "emphasis [bayes]: less → normal" in result.output
-    assert store.load_goal("prob").emphasis == {}
-    assert _goal_yaml(data)["emphasis"] == {}
+    assert store.load_goal("prob").emphasis == {"bayes": "normal"}
+    assert _goal_yaml(data)["emphasis"] == {"bayes": "normal"}
+    shown = yaml.safe_load(runner.invoke(app, ["tune", "prob"]).output)
+    assert shown["emphasis"] == {}  # the default goes unsaid
 
 
 def test_tune_with_nothing_to_change_does_not_commit(monkeypatch, tmp_path):

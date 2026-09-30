@@ -1,6 +1,13 @@
 from datetime import datetime
 
-from seba.models import GoalState, SessionRecord, Status, Syllabus, UpdateConcept
+from seba.models import (
+    Emphasis,
+    GoalState,
+    SessionRecord,
+    Status,
+    Syllabus,
+    UpdateConcept,
+)
 from seba.scheduler.items import apply_review, mint_item
 from seba.syllabus.graph import (
     SyllabusError,
@@ -54,7 +61,11 @@ def apply_record(state: GoalState, record: SessionRecord, now: datetime) -> Goal
     grades = {r.id: r.grade for r in record.reviews}
     items = [
         apply_review(
-            i, grades[i.id], now, state.settings, state.emphasis.get(i.concept)
+            i,
+            grades[i.id],
+            now,
+            state.settings,
+            state.emphasis.get(i.concept, Emphasis.NORMAL),
         )
         if i.id in grades
         else i

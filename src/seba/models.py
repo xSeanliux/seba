@@ -2,7 +2,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ItemType(StrEnum):
@@ -42,20 +42,28 @@ class PaceHint(StrEnum):
     STEP_BACK = "step-back"
 
 
+# py-fsrs defaults desired retention to 0.9. These bounds, from Seba's design,
+# are the limits Anki puts on it: below 0.70 most reviews are lapses; above 0.97
+# intervals shrink until workload grows without bound for little extra recall.
 RETENTION_MIN = 0.70
 RETENTION_MAX = 0.97
 
 
 class Emphasis(StrEnum):
+    # A concept with no entry in goal.yaml's `emphasis:` map is NORMAL.
     LESS = "less"
-    MORE = "more"  # normal is the absence of an entry
+    NORMAL = "normal"
+    MORE = "more"
 
 
 class GoalSettings(BaseModel):
     desired_retention: float = Field(0.9, ge=RETENTION_MIN, le=RETENTION_MAX)
     max_interval_days: int = Field(180, ge=1)
     concepts_per_session: int = Field(1, ge=1, le=5)
-    completion_passes: int = Field(1, ge=1)
+    # Distinct later sessions in which one of the concept's cards came back
+    # `good` or `easy`, needed before `completed` is allowed. Per session, not
+    # per card: two good cards in one session are one pass.
+    completion_passes: int = Field(3, ge=1)
 
 
 class GoalMeta(BaseModel):
@@ -70,15 +78,6 @@ class GoalMeta(BaseModel):
     # What the goal is for, as the learner now puts it; the syllabus's `goal`
     # line stands in until they set one.
     direction: str | None = None
-
-    @field_validator("emphasis", mode="before")
-    @classmethod
-    def _normal_is_no_entry(cls, v: dict[str, str] | str) -> dict[str, str] | str:
-        # `normal` is a level `tune` accepts, so a hand edit may write it; it
-        # means no entry. Anything malformed is left to the field's validation.
-        if isinstance(v, dict):
-            return {cid: e for cid, e in v.items() if e != "normal"}
-        return v
 
 
 class Concept(BaseModel):
