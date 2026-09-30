@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the `seba` CLI globally and link the seba-tutor skill into Claude Code.
+# Install the `seba` CLI globally and link every skill under skills/ into Claude Code.
 # Requires: uv (https://docs.astral.sh/uv/). Reverse with scripts/uninstall.sh.
 set -euo pipefail
 
@@ -11,6 +11,8 @@ cd "$repo"
 # A new prompt against an old CLI calls flags that don't exist yet.
 uv tool install --force --reinstall .
 mkdir -p "$HOME/.claude/skills"
-ln -sfn "$repo/skills/seba-tutor" "$HOME/.claude/skills/seba-tutor"
+for skill in "$repo"/skills/*/; do
+  ln -sfn "${skill%/}" "$HOME/.claude/skills/$(basename "$skill")"
+done
 
-echo "installed — run 'claude' and ask to study, or /seba-tutor"
+echo "installed — run 'claude' and ask to study, or /seba-tutor; /seba-syllabus changes a syllabus"
