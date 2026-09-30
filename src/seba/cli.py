@@ -412,7 +412,8 @@ def concepts(
 ):
     """Print the goal's direction; one line per concept (id, status, name,
     hard prerequisites, `dropped from`); then the frontier."""
-    state = _load_goal(_store(), goal)
+    store = _store()
+    state = _load_goal(store, goal)
     shown = [
         c
         for c in state.syllabus.concepts
@@ -421,6 +422,8 @@ def concepts(
     id_w = max((len(c.id) for c in shown), default=0)
     status_w = max((len(c.status) for c in shown), default=0)
     typer.echo(f"direction: {state.direction}")
+    if pending_path(store.data_dir, goal).exists():
+        typer.echo("session: in progress")  # `seba edit` refuses until it ends
     for c in shown:
         line = f"{c.id:<{id_w}}  {c.status:<{status_w}}  {c.name}"
         if c.prereqs:
