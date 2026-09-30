@@ -19,7 +19,7 @@ next session.
 | `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record grade as its exchange resolves; `--note` **required** on `hard` and `again` |
 | `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create card; small per-session budget, reported when hit |
 | `seba concept GOAL ID [--status started\|completed\|reopened\|dropped\|restored] [--evidence TEXT] [--note TEXT] [--add-source LOCATOR]` | record progress or misconception/strength note; `completed` **requires** `--evidence` (step 5); `started` on an `unseen` concept refused until its hard prerequisites are done; `reopened` only for a done concept, after learner agrees. `dropped`, `restored`, `--add-source` change syllabus from next session (see `changing-a-syllabus.md`) |
-| `seba extend GOAL --from-file PATH` | add learner-approved concepts from a file; acts at once, in or between sessions (see `changing-a-syllabus.md`) |
+| `seba extend GOAL --from-file PATH` | add learner-approved concepts from a file; acts at once, in or between sessions (mapping: `/seba-syllabus`) |
 | `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more] [--direction TEXT]` | no flags: print direction, settings and emphasis; flags: change them, print what changed. Mid-session limits: step 9 |
 | `seba end GOAL --summary TEXT --hint TEXT` | close session (refuses while reviews ungraded) |
 | `seba abandon GOAL [--discard]` | learner quits early: save what was recorded as INCOMPLETE (or discard) |
@@ -312,6 +312,8 @@ restart from zero (no cards: check skipped).
 
 ## Changing a syllabus
 
-When the learner wants to add, set aside, restore or steer to a concept, the
-direction has moved, or the briefing says the syllabus is running out: read
-`changing-a-syllabus.md` in this skill's directory then, not before.
+When the learner wants to set aside or steer to a concept, or the briefing
+says the syllabus is running out: read `changing-a-syllabus.md` in this
+skill's directory then, not before. Any other change to what goal covers (new
+source, restore, prerequisites, direction): suggest `/seba-syllabus` after the
+session.

@@ -1,41 +1,16 @@
-# Changing a syllabus
+# Changing a syllabus mid-session
 
-You propose; learner decides. Never drop, restore, extend, or change direction
-on your own judgment. `extend` and `--direction` act at once; dropping,
-restoring and `--add-source` apply from next session.
+You propose; learner decides. Never drop or steer on your own judgment. Any
+other change to what goal covers (new source, restore, prerequisites, new
+direction): suggest learner run `/seba-syllabus` after the session.
 
-## Mapping a new source
+## Dropping
 
-1. Skim only its abstract and headings. **Never load the whole of it.**
-2. Draft concepts with learner, reusing existing ids (`seba concepts GOAL`):
-   - One to three per source, each a session or two, named by what learner
-     could explain without the source. Never carved by section.
-   - Assumed background becomes its own concept and a hard prerequisite
-     (`prereqs`) of what needs it; `done` if learner has it, otherwise a gap
-     to teach.
-   - A source is never a concept: it goes, as slices, in `sources`.
-3. **Save only after an explicit yes:** `concepts:` list (schema under
-   Creating a new goal in `SKILL.md`, each `unseen` or `done`) in a temp file,
-   then `seba extend GOAL --from-file PATH`.
-4. Existing concept the source also teaches:
-   `seba concept GOAL ID --add-source LOCATOR`, one slice per call.
-
-Teach a new concept now, on an ordinary day: once current concept reaches a
-stopping point, `--status started` it, teach, mint. Counts against
-`concepts_per_session` like any follow-on.
-
-**Gap under an existing concept:** map it as a new concept; teach it first.
-Add the edge by hand in `$SEBA_DATA_DIR/goals/GOAL/syllabus.yaml` only if
-learner wants it.
-
-## Dropping and restoring
-
-`--status dropped` stops teaching and reviewing a concept, keeping its
-history; `--status restored` undoes that.
+Learner asks to set a concept aside: `seba concept GOAL ID --status dropped`.
+Applies from next session; stops teaching and reviewing it, keeping its
+history.
 - `cannot drop …` — tell learner what depends on it, ask; on a yes, drop those
-  first. Remove the edge in `syllabus.yaml` by hand only if learner agrees the
-  dependency is wrong.
-- `… depends on P, which is dropped …` — ask about restoring P.
+  first. Otherwise leave it for `/seba-syllabus`.
 - Review card whose concept was dropped this session: grade it `skipped`.
 
 ## Steering
@@ -64,14 +39,8 @@ Steered session is ordinary, whatever the day.
 - `steered: …` — teach their pick; don't argue for usual order.
 - `away: …` — acknowledge time away once, without guilt.
 
-## When the direction changes
-
-Record it in one line, in their words: `seba tune GOAL --direction TEXT`. Then
-propose dropping unseen concepts (`seba concepts GOAL`) **one at a time**,
-each with its reason, starting with those nothing depends on. Map any missing
-material.
-
 ## Running out
 
 `nearly out of syllabus` / `out of syllabus`: carry on. At a natural point,
-never as opener, ask what next: new source, new direction, or done.
+never as opener, ask what next: new source, new direction, or done. New source
+or direction → suggest `/seba-syllabus` after the session.
