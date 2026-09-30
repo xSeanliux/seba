@@ -29,4 +29,6 @@ fi
 # --project runs the bundle from any working directory (paths the skill passes
 # stay relative to it); --frozen never rewrites the bundled uv.lock; --no-dev
 # leaves the test and lint tools out.
+command -v uv >/dev/null ||
+  { echo "seba: uv is required (https://docs.astral.sh/uv/) and was not found on PATH" >&2; exit 127; }
 exec uv run --project "$root" --frozen --no-dev --quiet seba "$@"
