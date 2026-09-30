@@ -341,17 +341,16 @@ def concepts(
         None, "--grep", help="only concepts whose id or name contains TEXT"
     ),
 ):
-    """List the goal's concepts: id, status, name; then the frontier."""
+    """Print the goal's direction; one line per concept (id, status, name,
+    hard prerequisites, `dropped from`); then the frontier."""
     state = _load_goal(_store(), goal)
     shown = [
         c
         for c in state.syllabus.concepts
         if grep is None or grep.casefold() in f"{c.id}\n{c.name}".casefold()
     ]
-    if not shown:
-        return  # --grep matched nothing
-    id_w = max(len(c.id) for c in shown)
-    status_w = max(len(c.status) for c in shown)
+    id_w = max((len(c.id) for c in shown), default=0)
+    status_w = max((len(c.status) for c in shown), default=0)
     typer.echo(f"direction: {state.direction}")
     for c in shown:
         line = f"{c.id:<{id_w}}  {c.status:<{status_w}}  {c.name}"

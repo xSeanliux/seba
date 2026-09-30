@@ -674,10 +674,13 @@ def test_concepts_grep_matches_id_or_name_ignoring_case(
     assert lines[-1] == "frontier: bayes, sets"
 
 
-def test_concepts_grep_with_no_match_prints_nothing(monkeypatch, tmp_path):
+def test_concepts_grep_with_no_match_keeps_direction_and_frontier(
+    monkeypatch, tmp_path
+):
     _seed_concepts(env(monkeypatch, tmp_path))
     result = runner.invoke(app, ["concepts", "prob", "--grep", "topology"])
-    assert result.exit_code == 0 and result.output == ""
+    assert result.exit_code == 0, result.output
+    assert result.output == "direction: learn probability\nfrontier: bayes, sets\n"
 
 
 def test_concepts_frontier_none(monkeypatch, tmp_path):
