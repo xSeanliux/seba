@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from seba.models import (
     Agenda,
     Concept,
+    GoalSettings,
     GoalState,
     GradeReview,
     Item,
@@ -12,6 +13,7 @@ from seba.models import (
     SessionRecord,
     SubjectProfile,
     Syllabus,
+    UpdateConcept,
 )
 
 
@@ -114,3 +116,45 @@ def test_view_data_shape():
     blob = v.model_dump(mode="json")
     assert blob["generated"] == "2026-07-15"  # JSON-safe for the template
     assert blob["concepts"][0]["status"] == "unseen"  # enum -> plain string
+
+
+def test_goal_settings_defaults():
+    s = GoalSettings()
+    assert (
+        s.desired_retention,
+        s.max_interval_days,
+        s.concepts_per_session,
+        s.completion_passes,
+    ) == (0.9, 180, 1, 1)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("desired_retention", 0.69),
+        ("desired_retention", 0.98),
+        ("max_interval_days", 0),
+        ("concepts_per_session", 0),
+        ("concepts_per_session", 6),
+        ("completion_passes", 0),
+    ],
+)
+def test_goal_settings_refuses_out_of_range(field, value):
+    with pytest.raises(ValidationError):
+        GoalSettings.model_validate({field: value})
+
+
+def test_a_dropped_concept_round_trips_with_where_it_returns_to():
+    c = Concept(id="bayes", name="Bayes", status="dropped", dropped_from="in-progress")
+    back = Concept.model_validate(c.model_dump(mode="json"))
+    assert back == c and back.dropped_from == "in-progress"
+
+
+def test_a_concept_written_before_dropped_existed_loads():
+    c = Concept.model_validate({"id": "bayes", "name": "Bayes", "status": "done"})
+    assert c.dropped_from is None
+
+
+@pytest.mark.parametrize("change", ["dropped", "restored"])
+def test_update_concept_accepts_dropped_and_restored(change):
+    assert UpdateConcept(id="bayes", status_change=change).status_change == change

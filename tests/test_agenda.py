@@ -1,7 +1,20 @@
 from datetime import date
 
-from seba.models import Concept, GoalState, Item, SubjectProfile, Syllabus
+import pytest
+from seba.models import (
+    Concept,
+    Emphasis,
+    GoalSettings,
+    GoalState,
+    GradeReview,
+    Item,
+    SessionRecord,
+    SubjectProfile,
+    Syllabus,
+    UpdateConcept,
+)
 from seba.scheduler.agenda import build_agenda, resolve_excerpt
+from seba.store.store import Store
 
 TODAY = date(2026, 7, 3)
 
@@ -208,7 +221,10 @@ def test_stuck_check_threshold(tmp_path):
     assert (
         "stuck: [b] in progress for 3 session(s), correctness 0.25 over 4 graded" in b
     )
-    assert "switch representation" in b
+    assert (
+        "change approach: split the concept, step back to a prerequisite, or "
+        "switch representation." in b
+    )
 
     # under 4 graded opportunities the signal is noise — stay silent
     s2 = state(concepts, grades_by_concept={"b": ["again", "again", "hard"]})
@@ -216,6 +232,35 @@ def test_stuck_check_threshold(tmp_path):
     # and above the rate threshold, silent too
     s3 = state(concepts, grades_by_concept={"b": ["good", "good", "good", "again"]})
     assert "stuck:" not in build_agenda(s3, profile(), TODAY, tmp_path).briefing
+
+
+def test_stuck_counts_from_a_reopen(tmp_path):
+    store = Store(tmp_path / "data")
+    b = Concept(id="b", name="B", status="in-progress")
+    store.create_goal(
+        "prob",
+        Syllabus(goal="prob", subject="probability", concepts=[b]),
+        "probability",
+    )
+    gs = store.load_goal("prob").model_copy(
+        update={"items": [item("it-b", concept="b")]}
+    )
+    for change in ("started", None, None, "reopened", None):
+        store.save_session(
+            "prob",
+            SessionRecord(
+                reviews=[GradeReview(id="it-b", grade="again", note="n")],
+                concepts=[UpdateConcept(id="b", status_change=change)]
+                if change
+                else [],
+                complete=True,
+            ),
+            "t",
+            gs,
+        )
+    s = store.load_goal("prob")
+    briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert "stuck: [b] in progress for 2 session(s)" in briefing
 
 
 def test_session_types(tmp_path):
@@ -253,3 +298,170 @@ def test_deterministic(tmp_path):
     a1 = build_agenda(s, profile(), TODAY, tmp_path)
     a2 = build_agenda(s, profile(), TODAY, tmp_path)
     assert a1 == a2
+
+
+def trouble_state(**kw):
+    return state(
+        [Concept(id="a", name="A", status="done"), Concept(id="b", name="B")],
+        [item("it-a", concept="a", due="2099-01-01T00:00:00+00:00")],
+        **kw,
+    )
+
+
+def test_slipped_line_carries_the_run_and_the_note(tmp_path):
+    s = trouble_state(
+        last_trouble=[GradeReview(id="it-a", grade="again", note="mixed up e and x⁻¹")],
+        again_runs={"it-a": 2},
+    )
+    briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert (
+        'slipped: [a] it-a, 2 sessions running — "mixed up e and x⁻¹". '
+        "Propose re-teaching if the repair doesn't hold." in briefing
+    )
+
+
+def test_slipped_line_for_a_first_slip_without_a_note(tmp_path):
+    s = trouble_state(
+        last_trouble=[GradeReview(id="it-a", grade="again")], again_runs={"it-a": 1}
+    )
+    briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert "slipped: [a] it-a, 1 session running. Propose" in briefing
+
+
+@pytest.mark.parametrize(
+    "status,ending",
+    [
+        ("done", "Propose re-teaching if the repair doesn't hold."),
+        ("in-progress", "Still in progress: repair it this session."),
+        ("unseen", "Still in progress: repair it this session."),
+    ],
+)
+def test_slipped_line_ends_by_the_concepts_status(tmp_path, status, ending):
+    s = state(
+        [Concept(id="a", name="A", status=status)],
+        [item("it-a", concept="a", due="2099-01-01T00:00:00+00:00")],
+        last_trouble=[GradeReview(id="it-a", grade="again", note="n")],
+        again_runs={"it-a": 2},
+    )
+    briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert f'slipped: [a] it-a, 2 sessions running — "n". {ending}' in briefing
+
+
+def test_hard_line_carries_the_note(tmp_path):
+    s = trouble_state(
+        last_trouble=[GradeReview(id="it-a", grade="hard", note="needed the formula")]
+    )
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert 'hard: [a] it-a, passed with help — "needed the formula".' in a.briefing
+    assert "slipped:" not in a.briefing
+    assert a.review_items == []  # a `hard` pulls nothing in
+
+
+@pytest.mark.parametrize("grade", ["again", "hard"])
+def test_a_note_is_shown_on_one_line(tmp_path, grade):
+    note = "needed\nthe  formula\n\tagain"
+    s = trouble_state(last_trouble=[GradeReview(id="it-a", grade=grade, note=note)])
+    lines = build_agenda(s, profile(), TODAY, tmp_path).briefing.splitlines()
+    [line] = [x for x in lines if "it-a" in x]
+    assert '— "needed the formula again".' in line
+
+
+def test_trouble_on_a_deleted_card_is_skipped(tmp_path):
+    s = trouble_state(last_trouble=[GradeReview(id="it-gone", grade="again", note="n")])
+    assert "slipped:" not in build_agenda(s, profile(), TODAY, tmp_path).briefing
+
+
+def test_emphasis_lines(tmp_path):
+    s = trouble_state(emphasis={"b": Emphasis.MORE, "a": Emphasis.LESS})
+    briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert "emphasis: [a] less" in briefing and "emphasis: [b] more" in briefing
+    for quiet in (trouble_state(), trouble_state(emphasis={"a": Emphasis.NORMAL})):
+        assert (
+            "emphasis:" not in build_agenda(quiet, profile(), TODAY, tmp_path).briefing
+        )
+
+
+def test_no_emphasis_line_for_a_dropped_concept(tmp_path):
+    s = state(
+        [
+            Concept(id="a", name="A", status="dropped", dropped_from="done"),
+            Concept(id="b", name="B"),
+        ],
+        emphasis={"a": Emphasis.MORE, "b": Emphasis.LESS},
+    )
+    briefing = build_agenda(s, profile(), TODAY, tmp_path).briefing
+    assert "emphasis: [a]" not in briefing and "emphasis: [b] less" in briefing
+
+
+def test_concepts_per_session_lists_up_to_that_many(tmp_path):
+    concepts = [
+        Concept(id="a", name="A", status="done"),
+        Concept(id="b", name="B"),
+        Concept(id="c", name="C", status="in-progress"),
+        Concept(id="d", name="D", prereqs=["b"]),  # not ready: b is not done
+        Concept(id="e", name="E"),
+    ]
+    two = build_agenda(
+        state(concepts, settings=GoalSettings(concepts_per_session=2)),
+        profile(),
+        TODAY,
+        tmp_path,
+    )
+    assert two.teach_concept.id == "c"  # in progress comes first
+    assert [c.id for c in two.next_concepts] == ["b"]
+    assert "next: b — start it only once" in two.briefing
+
+    five = build_agenda(
+        state(concepts, settings=GoalSettings(concepts_per_session=5)),
+        profile(),
+        TODAY,
+        tmp_path,
+    )
+    assert [c.id for c in five.next_concepts] == ["b", "e"]  # only what is ready
+    assert (
+        "next: b, e — start each only once the one before it reaches a stopping "
+        "point; ending the session there is always fine." in five.briefing
+    )
+
+
+def test_one_ready_concept_lists_one(tmp_path):
+    s = state(
+        [Concept(id="a", name="A")], settings=GoalSettings(concepts_per_session=2)
+    )
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert a.teach_concept.id == "a" and a.next_concepts == []
+    assert "next:" not in a.briefing
+
+
+def test_the_default_is_one_concept(tmp_path):
+    s = state([Concept(id="a", name="A"), Concept(id="b", name="B")])
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert a.teach_concept.id == "a" and a.next_concepts == []
+
+
+def test_no_follow_ons_outside_an_ordinary_session(tmp_path):
+    concepts = [
+        Concept(id="a", name="A", status="done"),
+        Concept(id="b", name="B", status="done"),
+        Concept(id="c", name="C"),
+        Concept(id="d", name="D"),
+    ]
+    s = state(concepts, session_number=5, settings=GoalSettings(concepts_per_session=2))
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert a.session_type == "synthesis"
+    assert a.teach_concept is None and a.next_concepts == []
+
+
+def test_follow_ons_share_the_excerpt_budget(tmp_path):
+    (tmp_path / "a.md").write_text("x" * 12_000)
+    (tmp_path / "b.md").write_text("y" * 12_000)
+    s = state(
+        [
+            Concept(id="a", name="A", sources=["a.md"]),
+            Concept(id="b", name="B", sources=["b.md"]),
+        ],
+        settings=GoalSettings(concepts_per_session=2),
+    )
+    a = build_agenda(s, profile(), TODAY, tmp_path)
+    assert len(a.teach_concept.source_excerpts[0]) == 12_000
+    assert len(a.next_concepts[0].source_excerpts[0]) == 4_000

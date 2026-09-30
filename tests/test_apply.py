@@ -1,9 +1,11 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fsrs import Card
 
 from seba.models import (
     Concept,
+    Emphasis,
+    GoalSettings,
     GoalState,
     GradeReview,
     Item,
@@ -12,7 +14,7 @@ from seba.models import (
     Syllabus,
     UpdateConcept,
 )
-from seba.scheduler.apply import apply_record
+from seba.scheduler.apply import apply_change, apply_record, replay
 
 NOW = datetime(2026, 7, 3, tzinfo=timezone.utc)
 
@@ -78,40 +80,95 @@ def test_skipped_and_unknown_ids_are_safe():
     assert out.syllabus.concepts[0].status == "unseen"  # illegal move skipped, no error
 
 
-def done_state(recent: list[str] | None = None):
+def done_state():
     s = state()
     s.syllabus.concepts[0] = s.syllabus.concepts[0].model_copy(
         update={"status": "done"}
     )
-    return s.model_copy(update={"recent_by_item": {"it-1": recent or []}})
+    return s
 
 
-def test_lapsing_card_reopens_its_concept():
-    s = done_state(["good"])
-    rec = SessionRecord(reviews=[GradeReview(id="it-1", grade="again")])
-    out = apply_record(s, rec, NOW)
+def test_an_again_leaves_a_done_concept_done():
+    rec = SessionRecord(reviews=[GradeReview(id="it-1", grade="again", note="n")])
+    out = apply_record(done_state(), rec, NOW)
+    assert out.syllabus.concepts[0].status == "done"
+
+
+def test_reopened_moves_done_to_in_progress():
+    rec = SessionRecord(concepts=[UpdateConcept(id="bayes", status_change="reopened")])
+    out = apply_record(done_state(), rec, NOW)
     assert out.syllabus.concepts[0].status == "in-progress"
 
 
-def test_reopen_is_idempotent_and_ignores_older_lapses():
-    # a still-lapsing concept already reopened last session: no move, no error
-    s = state().model_copy(update={"recent_by_item": {"it-1": ["again"]}})
-    assert apply_record(s, SessionRecord(), NOW).syllabus.concepts[0].status == "unseen"
-    # an `again` older than the last two reviews no longer counts
-    stale = done_state(["again", "good", "good"])
-    assert (
-        apply_record(stale, SessionRecord(), NOW).syllabus.concepts[0].status == "done"
-    )
+def test_started_leaves_a_done_concept_done():
+    # a pending session written before `reopened` existed can still say `started`
+    rec = SessionRecord(concepts=[UpdateConcept(id="bayes", status_change="started")])
+    out = apply_record(done_state(), rec, NOW)
+    assert out.syllabus.concepts[0].status == "done"
 
 
-def test_completed_this_session_beats_the_lapse():
+def test_started_after_completed_in_one_session_leaves_it_done():
     s = state()
+    s.syllabus.concepts[0] = s.syllabus.concepts[0].model_copy(
+        update={"status": "in-progress"}
+    )
     rec = SessionRecord(
-        reviews=[GradeReview(id="it-1", grade="again")],
         concepts=[
-            UpdateConcept(id="bayes", status_change="started"),
             UpdateConcept(id="bayes", status_change="completed", evidence="e"),
-        ],
+            UpdateConcept(id="bayes", status_change="started"),
+        ]
     )
     out = apply_record(s, rec, NOW)
     assert out.syllabus.concepts[0].status == "done"
+
+
+def test_apply_record_uses_the_goals_settings_and_emphasis(monkeypatch):
+    monkeypatch.setattr("fsrs.scheduler.random", lambda: 0.5)
+    rec = SessionRecord(reviews=[GradeReview(id="it-1", grade="easy")])
+
+    def due_after(**update):
+        s = state().model_copy(update=update)
+        out = apply_record(s, rec, NOW)
+        return datetime.fromisoformat(out.items[0].fsrs["due"])
+
+    normal = due_after()
+    assert due_after(emphasis={"bayes": Emphasis.MORE}) < normal
+    assert due_after(emphasis={"other": Emphasis.MORE}) == normal
+    capped = due_after(settings=GoalSettings(max_interval_days=2))
+    assert capped - NOW <= timedelta(days=2)
+
+
+def test_an_unreviewed_card_keeps_its_due_date():
+    # Settings take effect at a card's next review; stored dates are not rewritten.
+    far = "2028-01-01T00:00:00+00:00"
+    s = state()
+    s.items[0] = s.items[0].model_copy(update={"fsrs": _fsrs(far)})
+    out = apply_record(s, SessionRecord(), NOW)
+    assert out.items[0].fsrs["due"] == far
+
+
+def _syl(status="unseen"):
+    return Syllabus(
+        goal="g",
+        subject="probability",
+        concepts=[Concept(id="bayes", name="B", status=status)],
+    )
+
+
+def test_replay_skips_an_illegal_move_and_applies_the_rest():
+    changes = [
+        UpdateConcept(id="bayes", status_change="completed", evidence="e"),  # illegal
+        UpdateConcept(id="bayes", status_change="started"),
+        UpdateConcept(id="bayes", status_change="started"),  # a repeat: skipped
+        UpdateConcept(id="bayes", status_change="completed", evidence="e"),
+        UpdateConcept(id="bayes", status_change="reopened"),
+        UpdateConcept(id="bayes", note="a note moves nothing"),
+    ]
+    assert replay(_syl(), changes).concepts[0].status == "in-progress"
+    out = apply_record(state(), SessionRecord(concepts=changes), NOW)
+    assert out.syllabus == replay(_syl(), changes)
+
+
+def test_apply_change_without_a_move_returns_the_syllabus():
+    s = _syl()
+    assert apply_change(s, UpdateConcept(id="bayes", note="n")) is s

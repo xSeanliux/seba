@@ -5,6 +5,8 @@ import yaml
 import pytest
 from seba.models import (
     Concept,
+    Emphasis,
+    GoalSettings,
     GradeReview,
     Item,
     MintItem,
@@ -144,7 +146,7 @@ def test_recent_grades_keyed_by_concept(store):
     assert gs2.recent_grades == ["again", "good"]  # global pool unchanged
 
 
-def test_delayed_pass_needs_a_later_session(store):
+def test_passes_count_later_sessions(store):
     store.create_goal("prob", syl(), "probability")
     gs = store.load_goal("prob").model_copy(update={"items": [item()]})
     started = SessionRecord(
@@ -153,17 +155,82 @@ def test_delayed_pass_needs_a_later_session(store):
         complete=True,
     )
     store.save_session("prob", started, "t", gs)
-    assert store.load_goal("prob").delayed_pass == set()  # same session doesn't count
+    assert store.load_goal("prob").passes == {"bayes": 0}  # same session: no
 
+    _save(store, gs, GradeReview(id="it-1", grade="easy"))
+    gs2 = store.load_goal("prob")
+    assert gs2.passes == {"bayes": 1}
+    assert gs2.again_runs == {}
+
+    _save(store, gs, GradeReview(id="it-1", grade="hard", note="one hint"))
+    assert store.load_goal("prob").passes == {"bayes": 1}  # a pass is good or easy
+
+    again_started = SessionRecord(
+        reviews=[GradeReview(id="it-1", grade="good")],
+        concepts=[UpdateConcept(id="bayes", status_change="started")],
+        complete=True,
+    )
+    store.save_session("prob", again_started, "t", gs)
+    assert store.load_goal("prob").passes == {"bayes": 2}  # re-recorded start
+
+
+def test_reopening_restarts_the_pass_count(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
     store.save_session(
         "prob",
-        SessionRecord(reviews=[GradeReview(id="it-1", grade="easy")], complete=True),
+        SessionRecord(
+            concepts=[UpdateConcept(id="bayes", status_change="started")],
+            complete=True,
+        ),
         "t",
         gs,
     )
-    gs2 = store.load_goal("prob")
-    assert gs2.delayed_pass == {"bayes"}
-    assert gs2.recent_by_item == {"it-1": ["good", "easy"]}  # last two only
+    _save(store, gs, GradeReview(id="it-1", grade="good"))
+    assert store.load_goal("prob").passes == {"bayes": 1}
+    store.save_session(
+        "prob",
+        SessionRecord(
+            reviews=[GradeReview(id="it-1", grade="good")],
+            concepts=[UpdateConcept(id="bayes", status_change="reopened")],
+            complete=True,
+        ),
+        "t",
+        gs,
+    )
+    assert store.load_goal("prob").passes == {"bayes": 0}
+    _save(store, gs, GradeReview(id="it-1", grade="good"))
+    assert store.load_goal("prob").passes == {"bayes": 1}
+
+
+def test_started_at_is_where_the_concept_last_went_in_progress(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob")
+
+    def record(change):
+        store.save_session(
+            "prob",
+            SessionRecord(
+                concepts=[UpdateConcept(id="bayes", status_change=change)],
+                complete=True,
+            ),
+            "t",
+            gs,
+        )
+
+    record("started")
+    record("started")  # a repeated start does not move it
+    assert store.load_goal("prob").started_at == {"bayes": 1}
+    _save(store, gs)
+    record("reopened")
+    assert store.load_goal("prob").started_at == {"bayes": 4}
+
+
+def test_a_concept_never_started_has_no_passes(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    _save(store, gs, GradeReview(id="it-1", grade="good"))
+    assert store.load_goal("prob").passes == {}
 
 
 def test_last_session_date_and_error_sites(store):
@@ -214,3 +281,208 @@ def test_historical_completed_without_evidence_still_loads(tmp_path):
     }
     (tmp_path / "goals/g/sessions/001.outcomes.yaml").write_text(yaml.safe_dump(old))
     assert store.load_goal("g").session_number == 2
+
+
+def _goal_yaml(store):
+    return store.data_dir / "goals" / "prob" / "goal.yaml"
+
+
+def _commits(store):
+    return subprocess.run(
+        ["git", "log", "--oneline"], cwd=store.data_dir, capture_output=True, text=True
+    ).stdout.splitlines()
+
+
+def test_goal_without_a_settings_block_loads_defaults(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob")
+    assert gs.settings == GoalSettings() and gs.emphasis == {}
+
+
+def test_save_tuning_roundtrip(store):
+    store.create_goal("prob", syl(), "probability")
+    settings = GoalSettings(desired_retention=0.85, max_interval_days=120)
+    assert store.save_tuning("prob", settings, {"bayes": Emphasis.MORE}, [item()])
+    gs = store.load_goal("prob")
+    assert gs.settings == settings
+    assert gs.emphasis == {"bayes": "more"}
+    assert gs.items[0].id == "it-1" and gs.subject == "probability"
+    assert "prob: tuned" in _commits(store)[0]
+
+
+def test_save_tuning_does_not_commit_when_nothing_changed(store):
+    store.create_goal("prob", syl(), "probability")
+    settings = GoalSettings(desired_retention=0.85)
+    assert store.save_tuning("prob", settings, {}, [])
+    before = _commits(store)
+    assert store.save_tuning("prob", settings, {}, []) is False
+    assert _commits(store) == before
+
+
+def test_save_tuning_leaves_other_staged_files_alone(store):
+    store.create_goal("prob", syl(), "probability")
+    store.save_tuning("prob", GoalSettings(desired_retention=0.85), {}, [])
+    (store.data_dir / "stray.txt").write_text("x")
+    subprocess.run(["git", "add", "stray.txt"], cwd=store.data_dir, check=True)
+    before = _commits(store)
+    assert (
+        store.save_tuning("prob", GoalSettings(desired_retention=0.85), {}, []) is False
+    )
+    assert _commits(store) == before
+
+
+def test_extend_and_tune_commit_only_their_own_files(store, tmp_path):
+    store.create_goal("prob", syl(), "probability")
+    (store.data_dir / "stray.txt").write_text("x")
+    subprocess.run(["git", "add", "stray.txt"], cwd=store.data_dir, check=True)
+
+    def last_commit():
+        return subprocess.run(
+            ["git", "show", "--name-only", "--format=", "HEAD"],
+            cwd=store.data_dir,
+            capture_output=True,
+            text=True,
+        ).stdout.split()
+
+    def staged():
+        return subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            cwd=store.data_dir,
+            capture_output=True,
+            text=True,
+        ).stdout.split()
+
+    more = tmp_path / "more.yaml"
+    more.write_text("- {id: odds, name: Odds}\n")
+    store.extend_syllabus("prob", more)
+    assert last_commit() == ["goals/prob/syllabus.yaml"]
+    assert staged() == ["stray.txt"]
+
+    assert store.save_tuning("prob", GoalSettings(desired_retention=0.85), {}, [])
+    assert last_commit() == ["goals/prob/goal.yaml"]
+    assert staged() == ["stray.txt"]
+
+
+def test_save_tuning_keeps_unknown_keys(store):
+    store.create_goal("prob", syl(), "probability")
+    path = _goal_yaml(store)
+    path.write_text(path.read_text() + "colour: teal\n")
+    store.save_tuning("prob", GoalSettings(), {}, [])
+    assert yaml.safe_load(path.read_text())["colour"] == "teal"
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        "settings:\n  desired_retention: 2.0\n",
+        "settings:\n  desired_retention: banana\n",
+        "settings:\n  max_interval_days: 0\n",
+        "settings: nonsense\n",
+        "emphasis:\n  bayes: lots\n",
+    ],
+)
+def test_malformed_goal_yaml_names_the_file(store, block):
+    store.create_goal("prob", syl(), "probability")
+    path = _goal_yaml(store)
+    path.write_text(path.read_text() + block)
+    with pytest.raises(StoreError, match="goal.yaml"):
+        store.load_goal("prob")
+
+
+def test_emphasis_on_an_unknown_concept_is_ignored_at_load(store):
+    store.create_goal("prob", syl(), "probability")
+    path = _goal_yaml(store)
+    path.write_text(path.read_text() + "emphasis:\n  ghost: more\n  bayes: less\n")
+    assert store.load_goal("prob").emphasis == {"bayes": "less"}
+
+
+def test_emphasis_normal_in_goal_yaml_loads_as_normal(store):
+    store.create_goal("prob", syl(), "probability")
+    path = _goal_yaml(store)
+    path.write_text(path.read_text() + "emphasis:\n  bayes: normal\n")
+    assert store.load_goal("prob").emphasis == {"bayes": Emphasis.NORMAL}
+
+
+def _save(store, gs, *reviews):
+    store.save_session(
+        "prob", SessionRecord(reviews=list(reviews), complete=True), "t", gs
+    )
+
+
+def test_hard_is_not_an_error_site(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    _save(store, gs, GradeReview(id="it-1", grade="hard", note="needed the formula"))
+    gs2 = store.load_goal("prob")
+    assert gs2.last_session_errors == set()
+    assert gs2.last_trouble == [
+        GradeReview(id="it-1", grade="hard", note="needed the formula")
+    ]
+    assert gs2.again_runs == {}
+
+
+def test_again_runs_count_the_trailing_run(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    _save(store, gs, GradeReview(id="it-1", grade="again", note="blanked"))
+    assert store.load_goal("prob").again_runs == {"it-1": 1}
+    _save(store, gs, GradeReview(id="it-1", grade="skipped"))  # ignored
+    _save(store, gs, GradeReview(id="it-1", grade="again", note="blanked again"))
+    gs3 = store.load_goal("prob")
+    assert gs3.again_runs == {"it-1": 2}
+    assert [r.note for r in gs3.last_trouble] == ["blanked again"]
+    assert gs3.last_session_errors == {"bayes"}
+    _save(store, gs, GradeReview(id="it-1", grade="hard", note="one hint"))
+    assert store.load_goal("prob").again_runs == {}  # a pass resets it
+
+
+def test_last_trouble_is_the_last_session_only(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    _save(store, gs, GradeReview(id="it-1", grade="again", note="blanked"))
+    _save(store, gs, GradeReview(id="it-1", grade="good"))
+    assert store.load_goal("prob").last_trouble == []
+
+
+def test_old_outcomes_without_notes_still_load(store):
+    store.create_goal("prob", syl(), "probability")
+    gs = store.load_goal("prob").model_copy(update={"items": [item()]})
+    _save(store, gs, GradeReview(id="it-1", grade="again"))  # as written before
+    gs2 = store.load_goal("prob")
+    assert gs2.last_trouble[0].note is None and gs2.again_runs == {"it-1": 1}
+
+
+def _syllabus_yaml(store):
+    return yaml.safe_load(
+        (store.data_dir / "goals" / "prob" / "syllabus.yaml").read_text()
+    )
+
+
+def test_syllabus_yaml_has_no_dropped_from_unless_a_concept_is_dropped(store):
+    store.create_goal("prob", syl(), "probability")
+    assert "dropped_from" not in _syllabus_yaml(store)["concepts"][0]
+    _save(store, store.load_goal("prob"))
+    assert "dropped_from" not in _syllabus_yaml(store)["concepts"][0]
+    dropped = Concept(id="bayes", name="B", status="dropped", dropped_from="unseen")
+    gs = store.load_goal("prob")
+    gs.syllabus.concepts[0] = dropped
+    _save(store, gs)
+    assert store.load_goal("prob").syllabus.concepts[0] == dropped
+
+
+def test_direction_falls_back_to_the_syllabus_goal_line(store):
+    s = syl().model_copy(update={"goal": "  read the Bayes literature \n"})
+    store.create_goal("prob", s, "probability")
+    assert store.load_goal("prob").direction == "read the Bayes literature"
+    path = _goal_yaml(store)
+    base = path.read_text()
+    path.write_text(base + "direction: '   '\n")
+    assert store.load_goal("prob").direction == "read the Bayes literature"
+    path.write_text(base + "direction: judge priors in A/B tests\n")
+    assert store.load_goal("prob").direction == "judge priors in A/B tests"
+
+
+def test_save_tuning_writes_no_empty_direction(store):
+    store.create_goal("prob", syl(), "probability")
+    store.save_tuning("prob", GoalSettings(desired_retention=0.85), {}, [])
+    assert "direction" not in yaml.safe_load(_goal_yaml(store).read_text())

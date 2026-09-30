@@ -2,7 +2,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ItemType(StrEnum):
@@ -25,6 +25,7 @@ class Status(StrEnum):
     UNSEEN = "unseen"
     IN_PROGRESS = "in-progress"
     DONE = "done"
+    DROPPED = "dropped"
 
 
 class SessionType(StrEnum):
@@ -41,6 +42,47 @@ class PaceHint(StrEnum):
     STEP_BACK = "step-back"
 
 
+# py-fsrs defaults desired retention to 0.9. These bounds are Seba's design. At
+# retention r about 1 - r of reviews are lapses, so below 0.70 a third or more
+# are, and relearning dominates the workload; above 0.97 intervals shrink so far
+# that workload grows steeply for little extra recall. Both sit inside the range
+# Anki accepts for FSRS desired retention (0.70 to 0.99).
+RETENTION_MIN = 0.70
+RETENTION_MAX = 0.97
+
+
+class Emphasis(StrEnum):
+    # A concept with no entry in goal.yaml's `emphasis:` map is NORMAL.
+    LESS = "less"
+    NORMAL = "normal"
+    MORE = "more"
+
+
+class GoalSettings(BaseModel):
+    desired_retention: float = Field(0.9, ge=RETENTION_MIN, le=RETENTION_MAX)
+    max_interval_days: int = Field(180, ge=1)
+    concepts_per_session: int = Field(1, ge=1, le=5)
+    # Distinct sessions, later than the one where the concept was started or
+    # last reopened, in which one of its cards came back `good` or `easy`,
+    # needed before `completed` is allowed. Per session, not
+    # per card: two good cards in one session are one pass.
+    completion_passes: int = Field(1, ge=1)
+
+
+class GoalMeta(BaseModel):
+    """goal.yaml. Unknown keys are kept so a hand-edited file survives a rewrite."""
+
+    model_config = ConfigDict(extra="allow")
+
+    name: str
+    subject: str
+    settings: GoalSettings = Field(default_factory=GoalSettings)
+    emphasis: dict[str, Emphasis] = Field(default_factory=dict)
+    # What the goal is for, as the learner now puts it; the syllabus's `goal`
+    # line stands in until they set one.
+    direction: str | None = None
+
+
 class Concept(BaseModel):
     id: str
     name: str
@@ -51,6 +93,8 @@ class Concept(BaseModel):
     confusable_with: list[str] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list)
     status: Status = Status.UNSEEN
+    # The status a dropped concept returns to when restored; None unless dropped.
+    dropped_from: Status | None = None
     est_sessions: int = 1
     kc_type: Literal["fact", "concept", "procedure", "principle"] = "concept"
 
@@ -77,6 +121,8 @@ class ReviewItem(BaseModel):
     type: ItemType
     front: str
     back: str
+    # Empty in a pending session saved before this field existed.
+    concept: str = ""
 
 
 class TeachConcept(BaseModel):
@@ -102,6 +148,9 @@ class Agenda(BaseModel):
     briefing: str
     review_items: list[ReviewItem]
     teach_concept: TeachConcept | None
+    # Follow-ons when the goal allows more than one concept a session. The tutor
+    # starts the next only once the current one reaches a stopping point.
+    next_concepts: list[TeachConcept] = Field(default_factory=list)
     practice_quota: int
     pace_hint: PaceHint
     session_type: SessionType = SessionType.ORDINARY
@@ -110,9 +159,10 @@ class Agenda(BaseModel):
 class GradeReview(BaseModel):
     """Grade a review item right after its exchange resolves.
 
-    Rubric: wrong or no recall -> again; correct with significant
-    hesitation or hints -> hard; correct -> good; instant and
-    confident -> easy; never reached this session -> skipped."""
+    Rubric: wrong or no recall -> again; correct, but only with
+    significant help -> hard (a pass); correct and unaided -> good;
+    instant and confident -> easy; never reached this session -> skipped.
+    `again` and `hard` need a note: what went wrong, or what the help was for."""
 
     id: str
     grade: Grade
@@ -133,8 +183,11 @@ class UpdateConcept(BaseModel):
     """Record concept progress or a note (misconception, strength)."""
 
     id: str
-    status_change: Literal["started", "completed"] | None = None
+    status_change: (
+        Literal["started", "completed", "reopened", "dropped", "restored"] | None
+    ) = None
     note: str | None = None
+    add_source: str | None = None
     # Required on `completed`, but enforced in ToolHandler, not here: this model
     # also parses historical outcomes written before the field existed, and a
     # validator would make old sessions unreadable.
@@ -169,25 +222,32 @@ class SubjectProfile(BaseModel):
 class GoalState(BaseModel):
     name: str
     subject: str
+    direction: str = ""
     syllabus: Syllabus
     items: list[Item]
     notes: str = ""
+    settings: GoalSettings = Field(default_factory=GoalSettings)
+    emphasis: dict[str, Emphasis] = Field(default_factory=dict)
     last_hint: str | None = None
     session_number: int
     recent_grades: list[Grade] = Field(default_factory=list)
     recent_by_concept: dict[str, list[Grade]] = Field(default_factory=dict)
-    recent_by_item: dict[str, list[Grade]] = Field(default_factory=dict)
     grades_by_concept: dict[str, list[Grade]] = Field(default_factory=dict)  # all-time
-    # Concepts graded `again`/`hard` in the most recent session only — Rosenshine's
-    # "review where errors were made last time", which the 3-session pool blurs.
+    # Concepts with a card graded `again` in the most recent session only —
+    # Rosenshine's "review where errors were made last time". `hard` is a pass
+    # and pulls nothing in.
     last_session_errors: set[str] = Field(default_factory=set)
-    started_at: dict[str, int] = Field(
-        default_factory=dict
-    )  # session first in-progress
+    # Per card, how many of its most recent reviews in a row were `again`.
+    again_runs: dict[str, int] = Field(default_factory=dict)
+    # The last session's `again` and `hard` reviews, with their notes.
+    last_trouble: list[GradeReview] = Field(default_factory=list)
+    # Session a concept last went in progress: its first `started`, moved on
+    # by each `reopened`.
+    started_at: dict[str, int] = Field(default_factory=dict)
     last_session_date: date | None = None
-    # Concepts with a good/easy card review in a session strictly after the one
-    # where teaching started — the delayed, unaided check `completed` is gated on.
-    delayed_pass: set[str] = Field(default_factory=set)
+    # Per concept, the distinct sessions with a good/easy card review, strictly
+    # after started_at — the delayed, unaided check `completed` is gated on.
+    passes: dict[str, int] = Field(default_factory=dict)
 
 
 class GoalSummary(BaseModel):
@@ -218,6 +278,8 @@ class ViewConcept(BaseModel):
 class ViewStats(BaseModel):
     concepts_done: int
     concepts_total: int
+    concepts_open: int = 0  # unseen or in progress
+    concepts_dropped: int = 0
     cards_total: int
     cards_due: int
     frontier: list[str]

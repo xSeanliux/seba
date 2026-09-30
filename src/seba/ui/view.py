@@ -16,9 +16,15 @@ def build_view_data(state: GoalState, today: date) -> ViewData:
         layer[cid] = 1 + max((layer[p] for p in by_id[cid].prereqs), default=-1)
 
     cutoff = today.isoformat()
+    dropped = {c.id for c in concepts if c.status == Status.DROPPED}
 
     def is_due(i) -> bool:
-        return not i.suspended and str(i.fsrs.get("due", ""))[:10] <= cutoff
+        # A dropped concept's cards are no longer reviewed, so none is due.
+        return (
+            not i.suspended
+            and i.concept not in dropped
+            and str(i.fsrs.get("due", ""))[:10] <= cutoff
+        )
 
     view_concepts = []
     for c in concepts:
@@ -39,6 +45,10 @@ def build_view_data(state: GoalState, today: date) -> ViewData:
     stats = ViewStats(
         concepts_done=sum(c.status == Status.DONE for c in concepts),
         concepts_total=len(concepts),
+        concepts_open=sum(
+            c.status in (Status.UNSEEN, Status.IN_PROGRESS) for c in concepts
+        ),
+        concepts_dropped=len(dropped),
         cards_total=len(state.items),
         cards_due=sum(1 for i in state.items if is_due(i)),
         frontier=[c.id for c in frontier(state.syllabus)],

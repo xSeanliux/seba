@@ -66,9 +66,12 @@ def test_apply_status_legal_and_illegal():
         apply_status(s, "nope", "done")
 
 
-def test_done_reopens_but_other_moves_back_are_illegal():
+def test_done_reopens_only_when_asked_and_other_moves_back_are_illegal():
     s = make([Concept(id="a", name="A", status="done")])
-    assert apply_status(s, "a", "in-progress").concepts[0].status == "in-progress"
+    with pytest.raises(SyllabusError):
+        apply_status(s, "a", "in-progress")  # nothing reopens by itself
+    reopened = apply_status(s, "a", "in-progress", reopen=True)
+    assert reopened.concepts[0].status == "in-progress"
     with pytest.raises(SyllabusError):
         apply_status(s, "a", "unseen")
     with pytest.raises(SyllabusError):
@@ -76,6 +79,8 @@ def test_done_reopens_but_other_moves_back_are_illegal():
     ip = make([Concept(id="a", name="A", status="in-progress")])
     with pytest.raises(SyllabusError):
         apply_status(ip, "a", "unseen")
+    with pytest.raises(SyllabusError):
+        apply_status(ip, "a", "in-progress", reopen=True)  # only done reopens
 
 
 def test_load_syllabus_yaml(tmp_path: Path):
@@ -180,3 +185,22 @@ def test_new_fields_round_trip(tmp_path: Path):
     p = tmp_path / "syllabus.yaml"
     p.write_text(yaml.safe_dump(s.model_dump(mode="json"), sort_keys=False))
     assert load_syllabus(p) == s
+
+
+def test_a_dropped_concept_and_what_needs_it_leave_the_frontier():
+    s = make(
+        [
+            Concept(id="a", name="A", status="dropped", dropped_from="unseen"),
+            Concept(id="b", name="B", prereqs=["a"]),
+            Concept(id="c", name="C"),
+        ]
+    )
+    assert [c.id for c in frontier(s)] == ["c"]
+
+
+@pytest.mark.parametrize("status", ["unseen", "in-progress", "done"])
+@pytest.mark.parametrize("reopen", [False, True])
+def test_apply_status_on_a_dropped_concept_is_a_syllabus_error(status, reopen):
+    s = make([Concept(id="a", name="A", status="dropped", dropped_from="done")])
+    with pytest.raises(SyllabusError, match="dropped"):
+        apply_status(s, "a", status, reopen=reopen)

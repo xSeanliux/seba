@@ -34,9 +34,20 @@ deterministic half only through the CLI, directed by the `seba-tutor` skill.
 - **Imports run strictly downward:** `cli → session → scheduler → store`;
   `syllabus` is a sibling used by `cli`/`store`. No circular imports.
 - **`ToolHandler` owns all outcome validation.** Never add a second validator
-  or default silently. Grades are `again | hard | good | easy | skipped`;
-  concept status moves `unseen → in-progress → done` one step forward only;
-  `mint_item` is capped at 10 per session.
+  or default silently. Grades are `again | hard | good | easy | skipped`, and a
+  card whose concept is dropped takes only `skipped`;
+  concept status moves `unseen → in-progress → done` one step forward only,
+  except `reopened` (`done → in-progress`), `dropped` (from any other status, while no
+  live concept has it as a hard prereq) and `restored` (back to the status it
+  was dropped from, while none of its hard prereqs is dropped); `started` on an
+  unseen concept needs its hard prereqs done. Every concept call is judged
+  against the syllabus as this session's record leaves it, not as it was at
+  `seba start`, and so is `seba extend`'s refusal of a new concept on a
+  dropped one;
+  `mint_item` is capped per session by `mint_budget`: 2 to 5, depending on
+  the subject's review capacity. It is a count of new cards, half the
+  session's review capacity, floored at 2 and capped at 5, so that new cards
+  never outrun what a session can review.
 - **Fail loudly.** A malformed state file raises an error naming the file; a
   CLI validation failure prints the reason to stderr and exits non-zero.
   Never swallow an error or silently default.
@@ -64,13 +75,16 @@ is the exception).
 | Command | Purpose |
 |---|---|
 | `seba status` | list goals with due counts |
-| `seba start GOAL` | begin/resume a session; prints the agenda YAML |
-| `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record a review grade |
+| `seba start GOAL [--concept ID]` | begin/resume a session; prints the agenda YAML. `--concept` teaches that concept instead of the usual pick (in progress or on the frontier; refused once a session is pending) |
+| `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record a review grade; `--note` is required on `hard` and `again` |
 | `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create a spaced-repetition card |
-| `seba concept GOAL ID [--status started\|completed] [--note TEXT]` | record concept progress or a note |
+| `seba concept GOAL ID [--status started\|completed\|reopened\|dropped\|restored] [--evidence TEXT] [--note TEXT] [--add-source LOCATOR]` | record concept progress, a note, or a source; `completed` requires `--evidence`; `reopened` is only for a done concept, once the learner has agreed. Drops, restores and sources are applied at `seba end` |
+| `seba extend GOAL --from-file PATH` | append concepts to the goal's syllabus; validated whole, written at once, works with or without a session pending; refuses a new concept whose hard prereq is dropped |
+| `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more] [--direction TEXT]` | no flags: print the goal's direction, settings and emphasis; with flags: change them. `--direction` is written at once. Works during a session, but the session's review list and follow-on concepts were fixed at `seba start`: emphasis `more` and `--concepts-per-session` show from the next session. Retention, the interval ceiling and emphasis take effect at each card's next review, including cards graded later in this session. `--retention` (default 0.9, py-fsrs's own) is bounded by design to 0.70–0.97: at retention r about 1 − r of reviews are lapses, so below 0.70 a third or more of reviews are lapses and relearning dominates the workload; above 0.97 the intervals shrink so far that the workload grows steeply for little extra recall. Both bounds sit inside the range Anki accepts for FSRS desired retention (0.70 to 0.99). `--completion-passes` (default 1) is the number of distinct sessions, later than the one where the concept was started or reopened, in which one of its cards came back `good` or `easy`, before `completed` is allowed: a pass is per session, not per card, and `good` counts as well as `easy` |
 | `seba end GOAL --summary TEXT --hint TEXT` | close the session |
 | `seba abandon GOAL [--discard]` | quit early: save as INCOMPLETE (or discard) |
 | `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a drafted syllabus YAML |
+| `seba concepts GOAL [--grep TEXT]` | list concepts, one per line: id, status, name, hard prereqs; `direction:` line first, `frontier:` line last. `--grep`: only concepts whose id or name contains TEXT (case-insensitive). Read-only |
 | `seba view GOAL [--json] [--open]` | render the goal's dependency graph + card status to HTML; `--json` prints the data blob instead, `--open` shows it in the browser |
 
 ## Data directory layout

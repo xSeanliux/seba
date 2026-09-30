@@ -5,7 +5,15 @@ from uuid import uuid4
 from fsrs import Card, Rating, Scheduler
 from fsrs.card import CardDict
 
-from seba.models import Grade, Item, MintItem
+from seba.models import (
+    RETENTION_MAX,
+    RETENTION_MIN,
+    Emphasis,
+    GoalSettings,
+    Grade,
+    Item,
+    MintItem,
+)
 
 _RATING = {
     "again": Rating.Again,
@@ -13,7 +21,12 @@ _RATING = {
     "good": Rating.Good,
     "easy": Rating.Easy,
 }
-_scheduler = Scheduler()
+_SHIFT = {Emphasis.MORE: 0.05, Emphasis.NORMAL: 0.0, Emphasis.LESS: -0.10}
+
+
+def target_retention(settings: GoalSettings, emphasis: Emphasis) -> float:
+    target = settings.desired_retention + _SHIFT[emphasis]
+    return min(RETENTION_MAX, max(RETENTION_MIN, target))
 
 
 def due_items(items: list[Item], today: date, limit: int) -> list[Item]:
@@ -27,13 +40,37 @@ def due_items(items: list[Item], today: date, limit: int) -> list[Item]:
     return due[:limit]
 
 
-def apply_review(item: Item, grade: Grade, now: datetime) -> Item:
+def apply_review(
+    item: Item,
+    grade: Grade,
+    now: datetime,
+    settings: GoalSettings,
+    emphasis: Emphasis,
+) -> Item:
     if grade == "skipped":
         return item
-    card, _ = _scheduler.review_card(
+    # No learning or relearning steps: those are minutes, for re-showing a card
+    # in the same sitting, and sessions are days apart. Every grade then yields
+    # at least a day and `hard` grows the interval.
+    scheduler = Scheduler(
+        desired_retention=target_retention(settings, emphasis),
+        learning_steps=(),
+        relearning_steps=(),
+        maximum_interval=settings.max_interval_days,
+    )
+    card, _ = scheduler.review_card(
         Card.from_dict(cast(CardDict, item.fsrs)), _RATING[grade], review_datetime=now
     )
     return item.model_copy(update={"fsrs": dict(card.to_dict())})
+
+
+def _start_of(today: date) -> str:
+    return datetime.combine(today, time.min, tzinfo=timezone.utc).isoformat()
+
+
+def due_now(item: Item, today: date) -> Item:
+    """Make a card due today. Used only when the learner sets emphasis `more`."""
+    return item.model_copy(update={"fsrs": {**item.fsrs, "due": _start_of(today)}})
 
 
 def mint_item(new: MintItem, today: date) -> Item:
@@ -41,7 +78,7 @@ def mint_item(new: MintItem, today: date) -> Item:
     # so scheduling stays deterministic in the passed date (spec §M2) and a
     # freshly minted card is due the day it is created.
     fsrs = dict(Card().to_dict())
-    fsrs["due"] = datetime.combine(today, time.min, tzinfo=timezone.utc).isoformat()
+    fsrs["due"] = _start_of(today)
     return Item(
         id=f"it-{uuid4().hex[:8]}",
         concept=new.concept,

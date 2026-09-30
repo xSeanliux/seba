@@ -5,12 +5,16 @@ from pydantic import BaseModel, ValidationError
 from seba.models import (
     Agenda,
     EndSession,
+    Grade,
     GradeReview,
     MintItem,
     SessionRecord,
+    Status,
     Syllabus,
     UpdateConcept,
 )
+from seba.scheduler.apply import apply_change, replay
+from seba.syllabus.graph import SyllabusError, check_teachable
 
 
 def mint_budget(max_reviews_per_session: int) -> int:
@@ -37,17 +41,26 @@ class ToolHandler:
         syllabus: Syllabus,
         sources_dir: Path,
         max_reviews_per_session: int,
-        delayed_pass: set[str],
+        passes: dict[str, int],
+        completion_passes: int,
         carded: set[str],
     ):
         self.agenda = agenda
         self.syllabus = syllabus
         self.sources_dir = sources_dir
         self.max_reviews = max_reviews_per_session
-        self.delayed_pass = delayed_pass
+        self.passes = passes
+        self.completion_passes = completion_passes
         self.carded = carded
         self.mint_budget = mint_budget(max_reviews_per_session)
         self.record = SessionRecord()
+
+    def effective(self) -> Syllabus:
+        """The syllabus as `seba end` will leave it: the one loaded at the
+        start of this command, with this session's record replayed over it.
+        Nothing reaches syllabus.yaml until then, so every status rule reads
+        this, never `self.syllabus`."""
+        return replay(self.syllabus, self.record.concepts)
 
     def missing_grades(self) -> list[str]:
         graded = {r.id for r in self.record.reviews}
@@ -64,10 +77,30 @@ class ToolHandler:
         return getattr(self, f"_{name}")(call)
 
     def _grade_review(self, call: GradeReview) -> tuple[str, bool]:
-        if call.id not in {r.id for r in self.agenda.review_items}:
+        item = next((r for r in self.agenda.review_items if r.id == call.id), None)
+        if item is None:
             return f"'{call.id}' is not in this session's review items", True
         if call.id in {r.id for r in self.record.reviews}:
             return f"'{call.id}' already graded", True
+        # The review list was fixed at start; a concept dropped since must not
+        # have its cards rescheduled or counted as passes.
+        if call.grade != Grade.SKIPPED and any(
+            c.id == item.concept and c.status == Status.DROPPED
+            for c in self.effective().concepts
+        ):
+            return (
+                f"'{call.id}' belongs to '{item.concept}', which is dropped — "
+                "grade it skipped"
+            ), True
+        if call.grade in (Grade.AGAIN, Grade.HARD) and not (call.note or "").strip():
+            # Enforced here, not on GradeReview: the model also parses old
+            # session outcomes, which have no notes.
+            what = (
+                "what went wrong"
+                if call.grade == Grade.AGAIN
+                else "what the help was for"
+            )
+            return f"grading '{call.grade}' requires --note saying {what}", True
         self.record.reviews.append(call)
         return "recorded", False
 
@@ -79,12 +112,49 @@ class ToolHandler:
             ), True
         if call.concept not in {c.id for c in self.syllabus.concepts}:
             return f"unknown concept: '{call.concept}'", True
+        if any(
+            c.id == call.concept and c.status == Status.DROPPED
+            for c in self.effective().concepts
+        ):
+            return (
+                f"'{call.concept}' is dropped; restore it before minting a card for it"
+            ), True
         self.record.new_items.append(call)
         return "minted", False
 
     def _update_concept(self, call: UpdateConcept) -> tuple[str, bool]:
         if call.id not in {c.id for c in self.syllabus.concepts}:
             return f"unknown concept: '{call.id}'", True
+        syllabus = self.effective()
+        concept = next(c for c in syllabus.concepts if c.id == call.id)
+        status = concept.status
+        if call.add_source is not None:
+            if not call.add_source.strip():
+                return "--add-source needs a locator", True
+            if call.add_source in concept.sources:
+                return f"'{call.add_source}' is already a source of '{call.id}'", True
+        # One answer for every move but restore, whichever rule below would
+        # otherwise speak first.
+        if call.status_change in ("started", "completed", "reopened") and (
+            status == Status.DROPPED
+        ):
+            return f"'{call.id}' is dropped; restore it first", True
+        if call.status_change == "reopened" and status != Status.DONE:
+            return (
+                f"'{call.id}' is {status}; only a done concept can be reopened"
+            ), True
+        if call.status_change == "started" and status == Status.DONE:
+            return (
+                f"'{call.id}' is done; reopening it is the learner's decision — "
+                "if they agree, use --status reopened"
+            ), True
+        if call.status_change == "started" and status == Status.UNSEEN:
+            # Hard edges are the curriculum, as for `seba start --concept`. A
+            # `started` on a concept in progress is a repeat, not checked.
+            try:
+                check_teachable(syllabus, call.id)
+            except SyllabusError as e:
+                return str(e), True
         note = ""
         if call.status_change == "completed" and not (call.evidence or "").strip():
             # Naming the exchange moves the call from mastery attribution (which
@@ -93,16 +163,30 @@ class ToolHandler:
                 "completing a concept requires --evidence: name the specific "
                 "exchange in this session that demonstrated the learner has it"
             ), True
-        if call.status_change == "completed" and call.id not in self.delayed_pass:
-            if call.id in self.carded:
+        # `passes` was counted at load; a reopen in this session restarts it now.
+        reopened_now = any(
+            c.id == call.id and c.status_change == "reopened"
+            for c in self.record.concepts
+        )
+        have = 0 if reopened_now else self.passes.get(call.id, 0)
+        if call.status_change == "completed" and have < self.completion_passes:
+            # `carded` was read at load; a card minted this session counts too.
+            if call.id in self.carded or any(
+                m.concept == call.id for m in self.record.new_items
+            ):
                 return (
-                    f"'{call.id}' has no unaided pass in a later session; it needs "
-                    "one good/easy review of one of its cards after the session "
-                    "where teaching started"
+                    f"'{call.id}' has {have} of {self.completion_passes} unaided "
+                    "pass(es) in a later session; each is a good/easy review of "
+                    "one of its cards, in a session after the one where teaching "
+                    "started or the concept was reopened"
                 ), True
             # No cards means the delayed check can never be satisfied; allowing it
             # unremarked would hide that this completion rests on the tutor alone.
             note = " (no cards for this concept, so the delayed check was skipped)"
+        try:
+            apply_change(syllabus, call)
+        except SyllabusError as e:
+            return str(e), True
         self.record.concepts.append(call)
         return "recorded" + note, False
 
