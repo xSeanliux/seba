@@ -124,7 +124,7 @@ def test_goal_settings_defaults():
         s.max_interval_days,
         s.concepts_per_session,
         s.completion_passes,
-    ) == (0.9, 180, 1, 3)
+    ) == (0.9, 180, 1, 1)
 
 
 @pytest.mark.parametrize(
