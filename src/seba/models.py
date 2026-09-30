@@ -41,6 +41,9 @@ class PaceHint(StrEnum):
     STEP_BACK = "step-back"
 
 
+# py-fsrs defaults desired retention to 0.9. These bounds, from Seba's design,
+# are the limits Anki puts on it: below 0.70 most reviews are lapses; above 0.97
+# intervals shrink until workload grows without bound for little extra recall.
 RETENTION_MIN = 0.70
 RETENTION_MAX = 0.97
 
