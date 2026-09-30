@@ -205,7 +205,7 @@ def drop(s: Syllabus, concept_id: str) -> Syllabus:
     if live:
         raise SyllabusError(
             f"cannot drop '{concept_id}': {', '.join(live)} depend on it — drop "
-            "them first, or remove the edge in syllabus.yaml"
+            "them first, or remove the edge with seba edit --remove-prereq"
         )
     return _replace(
         s, c.model_copy(update={"status": Status.DROPPED, "dropped_from": c.status})

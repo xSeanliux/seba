@@ -83,7 +83,7 @@ def test_a_live_dependent_blocks_a_drop_until_it_is_dropped():
     )
     msg = (
         "cannot drop 'a': b, e depend on it — drop them first, "
-        "or remove the edge in syllabus.yaml"
+        "or remove the edge with seba edit --remove-prereq"
     )
     with pytest.raises(SyllabusError) as e:
         drop(s, "a")

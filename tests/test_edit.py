@@ -188,8 +188,9 @@ def test_nothing_changed_writes_nothing(monkeypatch, tmp_path):
         (
             ["prob", "bayes", "--status", "dropped"],
             "cannot drop 'bayes': odds depend on it — drop them first, "
-            "or remove the edge in syllabus.yaml",
+            "or remove the edge with seba edit --remove-prereq",
         ),
+        (["prob", "lotp", "--status", ""], "--status must be dropped or restored"),
         (
             ["prob", "older", "--status", "restored"],
             "cannot restore 'older': it depends on old, which is dropped — "

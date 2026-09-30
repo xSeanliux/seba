@@ -2,7 +2,7 @@
 
 You propose; learner decides. Never drop or steer on your own judgment. Any
 other change to what goal covers (new source, restore, prerequisites, new
-direction): suggest learner run `/seba-syllabus` after the session.
+direction): suggest learner use the syllabus skill after the session.
 
 ## Dropping
 
@@ -10,7 +10,7 @@ Learner asks to set a concept aside: `seba concept GOAL ID --status dropped`.
 Applies from next session; stops teaching and reviewing it, keeping its
 history.
 - `cannot drop …` — tell learner what depends on it, ask; on a yes, drop those
-  first. Otherwise leave it for `/seba-syllabus`.
+  first. Otherwise leave it for the syllabus skill.
 - Review card whose concept was dropped this session: grade it `skipped`.
 
 ## Steering
@@ -43,4 +43,4 @@ Steered session is ordinary, whatever the day.
 
 `nearly out of syllabus` / `out of syllabus`: carry on. At a natural point,
 never as opener, ask what next: new source, new direction, or done. New source
-or direction → suggest `/seba-syllabus` after the session.
+or direction → suggest the syllabus skill after the session.

@@ -142,7 +142,8 @@ def edit_cmd(
             "editing the syllabus"
         )
     state = _load_goal(store, goal)
-    if not (name is not None or add_prereq or remove_prereq or add_source or status):
+    given = (name, status, add_prereq, remove_prereq, add_source)
+    if all(v is None for v in given):
         raise _refuse(f"nothing to edit — give {_EDIT_FLAGS}")
     if name is not None:
         name = " ".join(name.split())  # one line, as `seba concepts` prints it

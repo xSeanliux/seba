@@ -5,16 +5,16 @@ description: Change what a Seba goal covers, interactively, between sessions —
 
 # Seba syllabus
 
-Learner changes what a goal covers. You draft; learner decides. Nothing
-changes on your judgment alone. No teaching here: that is `seba-tutor`.
+Learner changes what a goal covers. You draft; learner decides. No teaching
+here.
 
 ## Commands (the `seba` CLI is on PATH)
 
 | Command | Purpose |
 |---|---|
 | `seba status` | list goals |
-| `seba concepts GOAL [--grep TEXT]` | curriculum: `direction:` line, `session: in progress` if one is pending, one line per concept (id, status, name, hard prereqs), `frontier:` line |
-| `seba edit GOAL ID [--name TEXT] [--add-prereq ID] [--remove-prereq ID] [--add-source LOCATOR] [--status dropped\|restored]` | change one concept; prereq and source flags repeatable, flags combine; prints one line per change |
+| `seba concepts GOAL [--grep TEXT]` | curriculum: `direction:` line, `session: in progress` if pending, one line per concept (id, status, name, hard prereqs), `frontier:` line |
+| `seba edit GOAL ID [--name TEXT] [--add-prereq ID] [--remove-prereq ID] [--add-source LOCATOR] [--status dropped\|restored]` | change one concept; prereq and source flags repeat; flags combine |
 | `seba extend GOAL --from-file PATH` | add concepts from a file |
 | `seba tune GOAL --direction TEXT` | restate what goal is for |
 
@@ -24,13 +24,13 @@ changes on your judgment alone. No teaching here: that is `seba-tutor`.
 ## Conversation
 
 1. Goal from arguments or learner; unclear → `seba status`, ask.
-2. `seba concepts GOAL`. **Run nothing else before this check:**
+2. `seba concepts GOAL`. **No change runs before this check:**
    `session: in progress` → stop; learner finishes it with the tutor skill,
    or `seba abandon GOAL`; then resume here. Otherwise show the part that
    matters; ask what to change. **One question per turn, then stop.**
 3. Draft exact change: every command you will run, and for new concepts the
    YAML. Show it. Ask "Apply this?" **Run nothing until an explicit yes.**
-   Otherwise revise, show again.
+   Otherwise revise.
 4. Run. Refusal → say what stood in the way, propose a fix, ask. Never work
    around a refusal.
 5. Show `seba concepts GOAL` so learner sees result.
