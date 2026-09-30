@@ -42,9 +42,11 @@ class PaceHint(StrEnum):
     STEP_BACK = "step-back"
 
 
-# py-fsrs defaults desired retention to 0.9. These bounds, from Seba's design,
-# are the limits Anki puts on it: below 0.70 most reviews are lapses; above 0.97
-# intervals shrink until workload grows without bound for little extra recall.
+# py-fsrs defaults desired retention to 0.9. These bounds are Seba's design. At
+# retention r about 1 - r of reviews are lapses, so below 0.70 a third or more
+# are, and relearning dominates the workload; above 0.97 intervals shrink so far
+# that workload grows steeply for little extra recall. Both sit inside the range
+# Anki accepts for FSRS desired retention (0.70 to 0.99).
 RETENTION_MIN = 0.70
 RETENTION_MAX = 0.97
 
@@ -60,8 +62,9 @@ class GoalSettings(BaseModel):
     desired_retention: float = Field(0.9, ge=RETENTION_MIN, le=RETENTION_MAX)
     max_interval_days: int = Field(180, ge=1)
     concepts_per_session: int = Field(1, ge=1, le=5)
-    # Distinct later sessions in which one of the concept's cards came back
-    # `good` or `easy`, needed before `completed` is allowed. Per session, not
+    # Distinct sessions, later than the one where the concept was started or
+    # last reopened, in which one of its cards came back `good` or `easy`,
+    # needed before `completed` is allowed. Per session, not
     # per card: two good cards in one session are one pass.
     completion_passes: int = Field(3, ge=1)
 
