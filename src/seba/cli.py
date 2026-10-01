@@ -31,7 +31,16 @@ from seba.syllabus.graph import SyllabusError, edit, frontier, load_syllabus
 from seba.ui import repl
 from seba.ui.view import build_view_data, render_view
 
-app = typer.Typer(no_args_is_help=True)
+app = typer.Typer(
+    no_args_is_help=True,
+    help=(
+        "A long-term personal tutor: spaced review and guided teaching for "
+        "goals that span many sessions. Each command is one step, reading "
+        "and writing state in $SEBA_DATA_DIR (default ~/seba-data), its own "
+        "git repository. Driven by the seba-tutor and seba-syllabus Claude "
+        "Code skills; seba status is the one command run by hand."
+    ),
+)
 
 
 def _store() -> Store:
@@ -63,15 +72,29 @@ def _load_goal(store: Store, goal: str) -> GoalState:
 @app.command("new-goal")
 def new_goal(
     name: str,
-    subject: str = typer.Option(...),
+    subject: str = typer.Option(..., help="an existing subject profile's name"),
     from_file: Path = typer.Option(
         ...,
         "--from-file",
         exists=True,
         dir_okay=False,
-        help="syllabus YAML drafted in conversation",
+        help="syllabus YAML drafted in conversation: goal, subject and concepts",
     ),
 ):
+    """Create a goal from a syllabus drafted in conversation.
+
+    Used by the syllabus skill, once, to set up a goal; never run mid-session.
+    Reads the subject profile and the syllabus file. Writes the goal's
+    directory (goal.yaml, syllabus.yaml, items.jsonl, notes.md) and commits
+    "<name>: created". Prints a line confirming the goal and how to start it.
+
+    Refuses:
+    - no subject profile '<subject>' — create <dir>/profile.yaml (copy from
+      <repo>/subjects/_templates/)
+    - <file>: <detail> — the syllabus file does not parse or validate
+      (duplicate concept ids, a prereq/soft_prereq/confusable_with naming an
+      id not in the file, or a prereq/soft_prereq cycle)
+    """
     store = _store()
     _profile(subject)
     try:
@@ -91,9 +114,32 @@ def extend_cmd(
         "--from-file",
         exists=True,
         dir_okay=False,
-        help="concepts YAML to add, drafted in conversation",
+        help="concepts to add: a bare list, or a mapping with a 'concepts:' list",
     ),
 ):
+    """Append learner-approved concepts to a goal's syllabus.
+
+    Used by the syllabus skill, drafting concepts for a new source; or by the
+    tutor mid-session, for a gap found while teaching. Reads the syllabus on
+    disk and, if a session is pending, that session's recorded concept
+    changes, so a new concept is judged against the syllabus as the session
+    has changed it. Writes syllabus.yaml and commits "<goal>: extended
+    (+<n>)". Prints the added ids. Acts at once; never touches the pending
+    session.
+
+    Refuses:
+    - no such goal: '<goal>'
+    - <file>: holds no concepts — expected a list of concepts, or a mapping
+      with a 'concepts:' list
+    - <file>: concept ids already in the syllabus: [<ids>]
+    - <file>: concept ids repeated in the file: [<ids>]
+    - <file>: new concept '<id>' has status <status>; a new concept is
+      unseen, or done if the learner already has it
+    - <file>: new concept '<id>' depends on <ids>, which is dropped —
+      restore that first
+    - <file>: <detail> — the file does not parse, or a concept fails
+      validation
+    """
     # Never touches the pending session: its agenda stands, and the next
     # command's handler is built from the extended syllabus on disk. Its
     # record is read so the new concepts are judged against what it changed.
@@ -122,17 +168,54 @@ def edit_cmd(
     concept_id: str,
     name: str | None = typer.Option(None, "--name", help="the concept's new name"),
     add_prereq: list[str] | None = typer.Option(
-        None, "--add-prereq", help="a hard prerequisite to add; repeatable"
+        None, "--add-prereq", help="a hard prerequisite (concept id) to add; repeatable"
     ),
     remove_prereq: list[str] | None = typer.Option(
-        None, "--remove-prereq", help="a hard prerequisite to remove; repeatable"
+        None,
+        "--remove-prereq",
+        help="a hard prerequisite (concept id) to remove; repeatable",
     ),
     add_source: list[str] | None = typer.Option(
         None, "--add-source", help="a locator to add to its sources; repeatable"
     ),
-    status: str | None = typer.Option(None, "--status", help="dropped|restored"),
+    status: str | None = typer.Option(None, "--status", help="dropped or restored"),
 ):
-    """Change one concept between sessions; written and committed at once."""
+    """Change one concept's name, hard prerequisites, sources, or dropped
+    status, between sessions.
+
+    Used by the learner through the syllabus skill. Reads the syllabus on
+    disk. Writes syllabus.yaml and commits "<goal>: edited <concept_id>",
+    unless nothing changed. Prints one line per change (name, prereq added or
+    removed, source added, status), or "nothing changed". Flags combine; give
+    at least one.
+
+    Refuses:
+    - a session is in progress for '<goal>' — end or abandon it before
+      editing the syllabus
+    - no such goal: '<goal>'
+    - nothing to edit — give --name, --add-prereq, --remove-prereq,
+      --add-source or --status
+    - --name needs text
+    - --status must be dropped or restored
+    - unknown concept: '<concept_id>'
+    - '<concept_id>' does not depend on <id> — --remove-prereq names an edge
+      that is not there
+    - '<concept_id>' cannot depend on itself — --add-prereq names itself
+    - '<concept_id>' already depends on <id> — --add-prereq names an edge
+      already there
+    - concept '<concept_id>' has unknown prereqs: [<ids>] — --add-prereq
+      names a concept id that does not exist
+    - cannot drop '<concept_id>': <ids> depend on it — drop them first, or
+      remove the edge with seba edit --remove-prereq
+    - '<concept_id>' is already dropped
+    - '<concept_id>' is <status>; only a dropped concept can be restored
+    - cannot restore '<concept_id>': it depends on <ids>, which is dropped —
+      restore that first
+    - concept '<concept_id>' depends on <ids>, which is dropped — restore
+      that first — a prerequisite added in this same call is dropped
+
+    Acts at once.
+    """
     store = _store()
     # A pending record and a direct edit must not disagree about the syllabus:
     # `seba end` replays the record onto whatever is on disk.
@@ -180,6 +263,12 @@ def edit_cmd(
 
 @app.command()
 def status():
+    """List every goal with its session count and how many cards are due today.
+
+    Used by anyone, any time; the one command run outside a skill. Reads
+    every goal under $SEBA_DATA_DIR. Writes nothing. Prints "no goals yet",
+    or one line per goal: name, subject, sessions so far, cards due today.
+    """
     try:
         goals = _store().list_goals()
     except StoreError as e:
@@ -255,9 +344,35 @@ def _finish(store: Store, goal: str, pending: PendingSession, ppath) -> None:
 def start(
     goal: str,
     concept: str | None = typer.Option(
-        None, "--concept", help="teach this concept today instead of the usual pick"
+        None,
+        "--concept",
+        help="teach this concept instead of the usual pick; must be in "
+        "progress or on the frontier",
     ),
 ):
+    """Begin today's session, or resume one already in progress.
+
+    Used by the tutor, once per session, before doing anything else. Reads
+    the goal's state and builds today's agenda (what's due, what to teach)
+    if none is pending; resuming prints "(resuming session in progress)"
+    instead. Writes session.pending.yaml. Prints the agenda as YAML:
+    `agenda`, `subject_style`, `already_graded`, `ungraded_reviews`,
+    `minted_so_far`, `concept_calls_so_far`.
+
+    Refuses:
+    - no such goal: '<goal>'
+    - a session is already in progress for '<goal>' — end or abandon it
+      before choosing a concept — only when --concept is given and a session
+      is already pending
+    - '<concept>' is dropped; restore it first
+    - '<concept>' is done; reopen it if the learner wants it taught again
+    - '<concept>' is not ready: <ids> must be done first — a hard
+      prerequisite is not yet done
+    - unknown concept: '<concept>'
+
+    `--concept` is refused once a session is pending; start a new session to
+    use it.
+    """
     store = _store()
     state = _load_goal(store, goal)
     ppath = pending_path(store.data_dir, goal)
@@ -303,18 +418,55 @@ def start(
 
 
 @app.command()
-def grade(goal: str, item_id: str, grade: str, note: str | None = typer.Option(None)):
+def grade(
+    goal: str,
+    item_id: str,
+    grade: str,
+    note: str | None = typer.Option(
+        None,
+        help="required for again or hard: what went wrong or what the help was for",
+    ),
+):
+    """Record a review grade for one card, as its exchange resolves.
+
+    Used by the tutor, immediately after each review item in `seba start`'s
+    `agenda.review_items`. Grade is again, hard, good, easy or skipped: skip
+    only an item the session never reached, or whose concept was dropped this
+    session. Reads this session's pending record. Writes
+    session.pending.yaml. Prints "recorded".
+
+    Refuses:
+    - no session in progress for '<goal>' — run: seba start <goal>
+    - '<item_id>' is not in this session's review items
+    - '<item_id>' already graded
+    - '<item_id>' belongs to '<concept>', which is dropped — grade it skipped
+    - grading '<grade>' requires --note saying what went wrong (again) or
+      what the help was for (hard)
+    """
     _dispatch(goal, "grade_review", {"id": item_id, "grade": grade, "note": note})
 
 
 @app.command()
 def mint(
     goal: str,
-    concept: str = typer.Option(...),
-    type: str = typer.Option(...),
-    front: str = typer.Option(...),
-    back: str = typer.Option(...),
+    concept: str = typer.Option(..., help="the concept this card belongs to"),
+    type: str = typer.Option(..., help="the card's item type, e.g. recall or apply"),
+    front: str = typer.Option(..., help="the question side"),
+    back: str = typer.Option(..., help="the answer side"),
 ):
+    """Create one spaced-repetition card for a concept.
+
+    Used by the tutor, mid-session, for material worth retaining a month —
+    the transfer version of a problem, not the one just worked. Reads this
+    session's pending record to check the per-session mint budget. Writes
+    session.pending.yaml. Prints "minted".
+
+    Refuses:
+    - no session in progress for '<goal>' — run: seba start <goal>
+    - mint budget reached (<n> this session); review capacity is <m>/session
+    - unknown concept: '<concept>'
+    - '<concept>' is dropped; restore it before minting a card for it
+    """
     _dispatch(
         goal,
         "mint_item",
@@ -327,9 +479,11 @@ def concept_cmd(
     goal: str,
     concept_id: str,
     status: str | None = typer.Option(
-        None, help="started|completed|reopened|dropped|restored"
+        None, help="started, completed, reopened, dropped or restored"
     ),
-    note: str | None = typer.Option(None),
+    note: str | None = typer.Option(
+        None, help="a durable note: a misconception (prefix MISCONCEPTION:) or strength"
+    ),
     evidence: str | None = typer.Option(
         None, help="required with --status completed: the exchange that showed it"
     ),
@@ -337,6 +491,40 @@ def concept_cmd(
         None, help="a locator to add to the concept's sources"
     ),
 ):
+    """Record a concept's progress, a note, or a source, during a session.
+
+    Used by the tutor, as teaching happens: --status started when teaching
+    begins, --status completed once the delayed check passes, a note for a
+    misconception or strength. `dropped`, `restored` and `--add-source` are
+    recorded now but only take effect in the syllabus at `seba end`; `started`
+    and `completed` take effect at once, since later calls in the same
+    session (passes, a repeat teach) depend on them. Reads this session's
+    pending record and the syllabus as it stands with that record replayed.
+    Writes session.pending.yaml. Prints "recorded", "recorded (no cards for
+    this concept, so the delayed check was skipped)" for a completion with no
+    cards, or the matching refusal.
+
+    Refuses:
+    - no session in progress for '<goal>' — run: seba start <goal>
+    - unknown concept: '<concept_id>'
+    - --add-source needs a locator
+    - '<locator>' is already a source of '<concept_id>'
+    - '<concept_id>' is dropped; restore it first — started, completed or
+      reopened on a dropped concept
+    - '<concept_id>' is <status>; only a done concept can be reopened
+    - '<concept_id>' is done; reopening it is the learner's decision — if
+      they agree, use --status reopened
+    - '<concept_id>' is not ready: <ids> must be done first — started on an
+      unseen concept with an undone hard prerequisite
+    - completing a concept requires --evidence: name the specific exchange in
+      this session that demonstrated the learner has it
+    - '<concept_id>' has <n> of <m> unaided pass(es) in a later session; each
+      is a good/easy review of one of its cards, in a session after the one
+      where teaching started or the concept was reopened
+
+    `dropped`, `restored` and a source added here apply at `seba end`;
+    `started`, `completed` and `reopened` apply at once.
+    """
     _dispatch(
         goal,
         "update_concept",
@@ -352,8 +540,28 @@ def concept_cmd(
 
 @app.command()
 def end(
-    goal: str, summary: str = typer.Option(...), hint: str = typer.Option(..., "--hint")
+    goal: str,
+    summary: str = typer.Option(..., help="3-6 sentences on what happened"),
+    hint: str = typer.Option(
+        ..., "--hint", help="a concrete procedure and stopping rule for next session"
+    ),
 ):
+    """Close the session and save it.
+
+    Applies the session's drops, restores and added sources to the syllabus
+    and folds its grades into the schedule. Used by the tutor, once, after
+    every review is graded. Reads this
+    session's pending record and the goal's state. Writes the session's files
+    (summary, outcomes, transcript) and the updated syllabus.yaml and
+    items.jsonl, commits "<goal>: session <n>", and deletes
+    session.pending.yaml. Prints a receipt of what the session recorded.
+
+    Refuses:
+    - no session in progress for '<goal>' — run: seba start <goal>
+    - session already ended
+    - cannot end: ungraded review items: <ids>. Grade each (or grade as
+      'skipped') first.
+    """
     store, pending, handler, ppath = _session(goal)
     result, is_error = handler.handle(
         "end_session", {"summary": summary, "next_session_hint": hint}
@@ -371,6 +579,20 @@ def abandon(
         False, "--discard", help="drop recorded outcomes instead of saving INCOMPLETE"
     ),
 ):
+    """End a session the learner quit early, without a summary or hint.
+
+    Used by the tutor when the learner stops abruptly; never leave a session
+    pending. By default, saves what was recorded as an INCOMPLETE session, the
+    same as `seba end` otherwise. With --discard, throws away everything
+    recorded this session instead: no grades, cards or concept changes reach
+    disk. Reads this session's pending record. Writes the session's files
+    (with --discard, nothing) and deletes session.pending.yaml. Prints a
+    receipt of what was discarded, or (without --discard) the same receipt
+    `seba end` prints.
+
+    Refuses:
+    - no session in progress for '<goal>' — run: seba start <goal>
+    """
     store, pending, handler, ppath = _session(goal)
     if discard:
         clear_pending(ppath)
@@ -387,10 +609,23 @@ def abandon(
 def view(
     goal: str,
     json_out: bool = typer.Option(
-        False, "--json", help="print the data blob instead of writing HTML"
+        False, "--json", help="print the view's data as JSON instead of writing HTML"
     ),
-    open_browser: bool = typer.Option(False, "--open", help="open the rendered view"),
+    open_browser: bool = typer.Option(
+        False, "--open", help="open the written HTML file in the browser"
+    ),
 ):
+    """Render the goal's dependency graph and card status.
+
+    Used by anyone, any time, usually after `seba end`. Reads the goal's
+    state. Writes nothing but the rendered file itself:
+    goals/<goal>/view.html, overwritten each run, never committed. With
+    --json, prints the view's data instead of writing that file. Prints the
+    path to the written file, unless --json.
+
+    Refuses:
+    - no such goal: '<goal>'
+    """
     store = _store()
     state = _load_goal(store, goal)
     data = build_view_data(state, date.today())
@@ -408,11 +643,24 @@ def view(
 def concepts(
     goal: str,
     grep: str | None = typer.Option(
-        None, "--grep", help="only concepts whose id or name contains TEXT"
+        None,
+        "--grep",
+        help="only concepts whose id or name contains TEXT (case-insensitive)",
     ),
 ):
-    """Print the goal's direction; one line per concept (id, status, name,
-    hard prerequisites, `dropped from`); then the frontier."""
+    """List the goal's curriculum: direction, every concept, and the frontier.
+
+    Used by anyone, any time, to look up a concept id or check what is ready.
+    Read-only: reads the goal's syllabus and writes nothing. Prints a
+    "direction:" line; "session: in progress" if a session is pending (`seba
+    edit` refuses until it ends); one line per concept — id, status, name,
+    "prereqs: ..." if it has hard prerequisites, "dropped from: <status>" if
+    dropped; then a "frontier:" line listing the concepts ready to teach.
+    --grep limits the concept lines to those whose id or name contains TEXT.
+
+    Refuses:
+    - no such goal: '<goal>'
+    """
     store = _store()
     state = _load_goal(store, goal)
     shown = [
@@ -460,16 +708,67 @@ def _refuse(message: str) -> typer.Exit:
 @app.command()
 def tune(
     goal: str,
-    retention: float | None = typer.Option(None, "--retention"),
-    max_interval: int | None = typer.Option(None, "--max-interval"),
-    concepts_per_session: int | None = typer.Option(None, "--concepts-per-session"),
-    completion_passes: int | None = typer.Option(None, "--completion-passes"),
-    concept: str | None = typer.Option(None, "--concept"),
-    emphasis: str | None = typer.Option(None, "--emphasis", help="less|normal|more"),
+    retention: float | None = typer.Option(
+        None,
+        "--retention",
+        help="desired retention, 0.70 to 0.97 (default 0.9); lower means longer "
+        "intervals",
+    ),
+    max_interval: int | None = typer.Option(
+        None,
+        "--max-interval",
+        help="longest gap between reviews, in days (default 180)",
+    ),
+    concepts_per_session: int | None = typer.Option(
+        None,
+        "--concepts-per-session",
+        help="how many concepts a session may teach, 1 to 5 (default 1)",
+    ),
+    completion_passes: int | None = typer.Option(
+        None,
+        "--completion-passes",
+        help="later sessions a concept's cards must pass before it can "
+        "complete, at least 1 (default 1)",
+    ),
+    concept: str | None = typer.Option(
+        None, "--concept", help="the concept whose emphasis to change; needs --emphasis"
+    ),
+    emphasis: str | None = typer.Option(
+        None, "--emphasis", help="less, normal or more"
+    ),
     direction: str | None = typer.Option(
         None, "--direction", help="what the goal is for, as the learner now puts it"
     ),
 ):
+    """Show or change a goal's settings, one concept's emphasis, or its
+    direction.
+
+    Used by the learner, through either skill, usually between sessions, but
+    also mid-session for a direct ask ("review bayes more"). With no flags,
+    reads and prints the goal's direction, settings and non-default emphasis;
+    with any flag, changes what it names. Reads the goal's state. Writes
+    goal.yaml and items.jsonl (only emphasis `more` touches cards, moving
+    them to due now) and commits "<goal>: tuned", unless nothing changed.
+    Prints what changed, one line per setting, or "nothing changed".
+
+    Refuses:
+    - no such goal: '<goal>'
+    - --retention must be between 0.7 and 0.97
+    - --max-interval must be at least 1
+    - --concepts-per-session must be between 1 and 5
+    - --completion-passes must be at least 1
+    - --direction needs text
+    - --concept and --emphasis go together — one given without the other
+    - unknown concept: '<concept>'
+    - --emphasis must be one of: less, normal, more
+
+    `--retention`, the interval ceiling and emphasis apply at each card's next
+    review, including later in a session already under way; emphasis `more`
+    also makes that concept's cards due now. `--concepts-per-session` and a
+    changed emphasis otherwise show from the next session: the current
+    session's review list and follow-on concepts were fixed at `seba start`.
+    `--direction` is written at once.
+    """
     store = _store()
     state = _load_goal(store, goal)
     asked = {
