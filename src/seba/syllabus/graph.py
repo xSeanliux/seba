@@ -1,5 +1,6 @@
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import TypeAdapter, ValidationError
@@ -60,6 +61,16 @@ def load_concepts(path: Path) -> list[Concept]:
     return concepts
 
 
+def _refuse_dropped_prereqs(c: Concept, dropped: set[str], label: str) -> None:
+    """A live concept may not stand on a dropped one."""
+    gone = [p for p in c.prereqs if p in dropped]
+    if gone:
+        raise SyllabusError(
+            f"{label} '{c.id}' depends on {', '.join(gone)}, which is "
+            "dropped — restore that first"
+        )
+
+
 def extend(
     s: Syllabus, new: list[Concept], *, against: Syllabus | None = None
 ) -> Syllabus:
@@ -86,12 +97,7 @@ def extend(
         if c.status == "dropped"
     }
     for c in new:
-        gone = [p for p in c.prereqs if p in dropped]
-        if gone:
-            raise SyllabusError(
-                f"new concept '{c.id}' depends on {', '.join(gone)}, which is "
-                "dropped — restore that first"
-            )
+        _refuse_dropped_prereqs(c, dropped, "new concept")
     merged = s.model_copy(update={"concepts": [*s.concepts, *new]})
     validate(merged)
     return merged
@@ -199,7 +205,7 @@ def drop(s: Syllabus, concept_id: str) -> Syllabus:
     if live:
         raise SyllabusError(
             f"cannot drop '{concept_id}': {', '.join(live)} depend on it — drop "
-            "them first, or remove the edge in syllabus.yaml"
+            "them first, or remove the edge with seba edit --remove-prereq"
         )
     return _replace(
         s, c.model_copy(update={"status": Status.DROPPED, "dropped_from": c.status})
@@ -224,3 +230,42 @@ def restore(s: Syllabus, concept_id: str) -> Syllabus:
             update={"status": c.dropped_from or Status.UNSEEN, "dropped_from": None}
         ),
     )
+
+
+def edit(
+    s: Syllabus,
+    concept_id: str,
+    *,
+    name: str | None = None,
+    add_prereqs: list[str] | None = None,
+    remove_prereqs: list[str] | None = None,
+    add_sources: list[str] | None = None,
+    status: Literal["dropped", "restored"] | None = None,
+) -> Syllabus:
+    """One concept changed by the learner, checked by the rules everything else
+    obeys: edges first, then `validate`, then `drop`/`restore`."""
+    c = _find(s, concept_id)
+    prereqs = list(c.prereqs)
+    for p in remove_prereqs or []:
+        if p not in prereqs:
+            raise SyllabusError(f"'{concept_id}' does not depend on {p}")
+        prereqs.remove(p)
+    for p in add_prereqs or []:
+        if p == concept_id:
+            raise SyllabusError(f"'{concept_id}' cannot depend on itself")
+        if p in prereqs:
+            raise SyllabusError(f"'{concept_id}' already depends on {p}")
+        prereqs.append(p)
+    sources = list(dict.fromkeys([*c.sources, *(add_sources or [])]))
+    update = {"name": name or c.name, "prereqs": prereqs, "sources": sources}
+    s = _replace(s, c.model_copy(update=update))
+    validate(s)
+    if status == "dropped":
+        s = drop(s, concept_id)
+    elif status == "restored":
+        s = restore(s, concept_id)
+    edited = _find(s, concept_id)
+    if edited.status != "dropped":
+        dropped = {d.id for d in s.concepts if d.status == "dropped"}
+        _refuse_dropped_prereqs(edited, dropped, "concept")
+    return s

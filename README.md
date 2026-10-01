@@ -10,15 +10,25 @@ A long-term personal tutor, mid-relationship with each learner. It owns a
 curriculum (concept graph) and longitudinal learner state (FSRS review
 scheduling + per-concept notes), all stored as plain text in a git-backed data
 directory. The graph is a revisable prior, not a settled plan: some edges advise
-rather than gate, a concept marked done reopens when its cards lapse, and
+rather than gate, nothing reopens by itself (when a done concept's cards slip,
+the tutor says so and proposes re-teaching it, and the learner decides), and
 marking one done needs evidence from a later session, not the tutor's word on
 the day. Code owns state, scheduling, and validation; Claude Code owns dialogue
 and grading, recorded through validated outcome commands.
 
+The learner steers the schedule with a retention target, an interval ceiling,
+and per-concept emphasis (`seba tune`). These reach it as the scheduler's own
+inputs; Seba never second-guesses the scheduler on its own. The syllabus can
+change while a goal is under way: concepts added from a new source, set aside
+and restored, their prerequisites rewired, the direction restated.
+
 Sessions run inside Claude Code — your subscription, not a metered API key, no
-per-token cost. The `seba` CLI owns state, scheduling, and validation; the
-`seba-tutor` skill instructs Claude Code to conduct the dialogue and record
-outcomes through it. You talk to Claude Code; it drives `seba` for you.
+per-token cost. The `seba` CLI owns state, scheduling, and validation; two
+skills instruct Claude Code to drive it. `seba-tutor` conducts a session:
+review, teaching, and recording outcomes. `seba-syllabus` changes what a goal
+covers, between sessions, by conversation: it drafts each change, shows it to
+you, and applies it only once you agree. You talk to Claude Code; it drives
+`seba` for you.
 
 ## Install
 
@@ -66,6 +76,15 @@ would drive the old CLI.
 From any directory, run `claude`, then ask to study — or invoke `/seba:seba-tutor`
 (`/seba-tutor` from a checkout install).
 Claude Code handles the dialogue and calls `seba` for you.
+
+To change what a goal covers (add a paper or chapter, set a concept aside or
+bring it back, change a concept's prerequisites or name, restate the
+direction), ask for it outside a session, or invoke `/seba:seba-syllabus`
+(`/seba-syllabus` from a checkout install).
+
+`seba concepts GOAL` prints the curriculum at a glance.
+
+`seba view GOAL --open` opens a page showing progress and the dependency graph.
 
 Learner data lives in `$SEBA_DATA_DIR` (default `~/seba-data`), its own git
 repo with one commit per saved session. If a session crashes, just ask to study

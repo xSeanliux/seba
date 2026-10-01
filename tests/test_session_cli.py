@@ -692,6 +692,21 @@ def test_concepts_frontier_none(monkeypatch, tmp_path):
     assert result.output.splitlines()[-1] == "frontier: none"
 
 
+def test_concepts_says_when_a_session_is_pending(monkeypatch, tmp_path):
+    data = env(monkeypatch, tmp_path)
+    _seed_concepts(data)
+    assert runner.invoke(app, ["start", "prob"]).exit_code == 0
+    pending = data / "goals" / "prob" / "session.pending.yaml"
+    held, before = pending.read_bytes(), _commit_count(data)
+    result = runner.invoke(app, ["concepts", "prob", "--grep", "sets"])
+    assert result.exit_code == 0, result.output
+    assert result.output.splitlines()[:2] == [
+        "direction: learn probability",
+        "session: in progress",
+    ]
+    assert pending.read_bytes() == held and _commit_count(data) == before
+
+
 def test_concepts_on_an_unknown_goal_fails_cleanly(monkeypatch, tmp_path):
     env(monkeypatch, tmp_path)
     result = runner.invoke(app, ["concepts", "nope"])
