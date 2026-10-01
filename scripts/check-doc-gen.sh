@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generate or check docs/cli.md, the CLI reference generated from src/seba/cli.py.
-# Usage: scripts/docs.sh gen | scripts/docs.sh check
+# Usage: scripts/check-doc-gen.sh gen | scripts/check-doc-gen.sh check
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

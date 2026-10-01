@@ -30,8 +30,8 @@ format:
 
 # Regenerate the CLI reference from the code.
 docs-gen:
-	./scripts/docs.sh gen
+	./scripts/check-doc-gen.sh gen
 
 # CI gate: fails if docs/cli.md drifts from src/seba/cli.py.
 docs-check:
-	./scripts/docs.sh check
+	./scripts/check-doc-gen.sh check
