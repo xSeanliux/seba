@@ -1,6 +1,6 @@
 [project]
 name = "seba"
-version = "0.2.0"
+version = "0.2.1"
 description = "seba — a long-term personal tutor in the terminal"
 readme = "README.md"
 authors = [
