@@ -43,7 +43,7 @@ def _profile(subject: str) -> SubjectProfile:
         typer.echo(
             f"no subject profile '{subject}' — create "
             f"{config.data_dir()}/subjects/{subject}/profile.yaml "
-            f"(copy from subjects/_templates/)",
+            f"(copy from {config.REPO_ROOT / 'subjects' / '_templates'}/)",
             err=True,
         )
         raise typer.Exit(1)
