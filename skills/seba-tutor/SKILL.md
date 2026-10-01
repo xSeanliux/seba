@@ -27,6 +27,8 @@ next session.
 | `seba concepts GOAL [--grep TEXT]` | list concepts, one per line: id, status, name, hard prereqs; `direction:` line first, `frontier:` line last. `--grep`: only concepts whose id or name contains TEXT (case-insensitive). Read-only |
 | `seba view GOAL [--json] [--open]` | dependency graph + card status as HTML; `--json`: data instead; `--open`: in browser |
 
+Full reference: `docs/cli.md` (under the plugin if installed as one; in the repo from a checkout).
+
 Failed command: read message, fix call, retry. Never work around a refusal.
 
 ## Session protocol
