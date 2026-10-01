@@ -1,12 +1,4 @@
-.PHONY: check test typecheck lint fmt format install uninstall docs-gen docs-check
-
-# Install the `seba` CLI globally and link the seba-tutor skill into Claude Code.
-install:
-	./scripts/install.sh
-
-# Remove both.
-uninstall:
-	./scripts/uninstall.sh
+.PHONY: check test typecheck lint fmt format docs-gen docs-check
 
 # Run every CI check locally.
 check: lint fmt typecheck docs-check test
