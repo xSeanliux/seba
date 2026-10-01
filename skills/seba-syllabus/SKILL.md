@@ -47,10 +47,10 @@ tutor's mid-session new-source path.
   plainly (`smith2024.pdf`, `ch03.md`): a URL → `curl -L -o` (PDF or page); a
   local file → copy it; a web page worth keeping as text → save it as `.md`,
   so `seba start` can pre-load slices of it later the same way it does for
-  any other markdown source. Skip anything over ~50MB and keep the URL as the
-  locator instead — `$SEBA_DATA_DIR` is a git repo, `seba end` commits
-  everything under it, and a large PDF would land in that history; accepted
-  for a normal paper or chapter, not worth it past that size.
+  any other markdown source. Over ~50MB → say the size and that it'll land in
+  the data repo's history (`$SEBA_DATA_DIR` is a git repo, `seba end` commits
+  everything under it), ask whether to keep it on disk anyway or keep the URL
+  as the locator instead, and do what they say.
   Can't fetch it (paywall, login, interactive site) → keep the URL as the
   locator and say so to the learner; the tutor fetches the bounded slice at
   teach time, same as it already does for a URL source.
