@@ -32,7 +32,28 @@ you, and applies it only once you agree. You talk to Claude Code; it drives
 
 ## Install
 
-Requires Python ≥3.12 and [`uv`](https://docs.astral.sh/uv/).
+Requires [`uv`](https://docs.astral.sh/uv/), which fetches Python ≥3.12 and
+Seba's dependencies itself.
+
+### As a Claude Code plugin
+
+```bash
+claude plugin marketplace add xSeanliux/seba
+claude plugin install seba@seba
+```
+
+That is the whole install. The plugin puts a `seba` command on the PATH of
+Claude Code's Bash tool (not your own shell's); its first run builds Seba's
+environment, which takes a few seconds.
+
+Every merge to `main` is a release with a new version, except pull requests
+labelled `no-release`. To get it, run
+`claude plugin update seba@seba`, or turn on auto-update once under
+`/plugin` → Marketplaces → seba → Enable auto-update; Claude Code then updates
+in the background and asks you to `/reload-plugins`. Remove with
+`claude plugin uninstall seba@seba`. Your learner data is not touched.
+
+### From a checkout (the older way)
 
 ```bash
 git clone https://github.com/xSeanliux/seba
@@ -42,12 +63,13 @@ make install          # or: ./scripts/install.sh
 
 This installs the `seba` CLI (`uv tool install`) and links the `seba-tutor`
 skill into `~/.claude/skills/`. Reverse with `make uninstall` (or
-`./scripts/uninstall.sh`).
+`./scripts/uninstall.sh`). To update, `git pull` then `make install`. The
+skill is a symlink and so is already live after the pull; the CLI is a copy
+and needs the reinstall, which is what `make install` is for.
 
-Not a Claude Code plugin — `/plugin` doesn't manage it. To update, `git pull`
-then `make install`. The skill is a symlink and so is already live after the
-pull; the CLI is a copy and needs the reinstall, which is what `make install`
-is for.
+Use one or the other. When you switch to the plugin, run `make uninstall`
+first: a `seba` on your own PATH wins over the plugin's, so the plugin's skill
+would drive the old CLI.
 
 ## Use
 
