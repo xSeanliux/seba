@@ -19,11 +19,10 @@ next session.
 | `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record grade as its exchange resolves; `--note` **required** on `hard` and `again` |
 | `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create card; small per-session budget, reported when hit |
 | `seba concept GOAL ID [--status started\|completed\|reopened\|dropped\|restored] [--evidence TEXT] [--note TEXT] [--add-source LOCATOR]` | record progress or misconception/strength note; `completed` **requires** `--evidence` (step 5); `started` on an `unseen` concept refused until its hard prerequisites are done; `reopened` only for a done concept, after learner agrees. `dropped`, `restored`, `--add-source` change syllabus from next session. In-session drop: step 5; restore or add a source: syllabus skill, between sessions |
-| `seba extend GOAL --from-file PATH` | add learner-approved concepts from a file; acts at once, in or between sessions (mapping: syllabus skill) |
+| `seba extend GOAL --from-file PATH` | add learner-approved concepts from a file; acts at once, in or during a session (mapping: syllabus skill; new source mid-session: Changing a syllabus) |
 | `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more] [--direction TEXT]` | no flags: print direction, settings and emphasis; flags: change them, print what changed. Mid-session limits: step 9 |
 | `seba end GOAL --summary TEXT --hint TEXT` | close session (refuses while reviews ungraded) |
 | `seba abandon GOAL [--discard]` | learner quits early: save what was recorded as INCOMPLETE (or discard) |
-| `seba new-goal NAME --subject SUBJECT --from-file PATH` | create goal from syllabus YAML you drafted |
 | `seba concepts GOAL [--grep TEXT]` | list concepts, one per line: id, status, name, hard prereqs; `direction:` line first, `frontier:` line last. `--grep`: only concepts whose id or name contains TEXT (case-insensitive). Read-only |
 | `seba view GOAL [--json] [--open]` | dependency graph + card status as HTML; `--json`: data instead; `--open`: in browser |
 
@@ -114,7 +113,8 @@ restart from zero (no cards: check skipped).
 
 1. `seba status`; if user named a goal, `seba start GOAL` directly. If they
    also asked for a particular concept, or last hint carries such a request,
-   steer (Steering, below).
+   steer (Steering, below). No goal yet, or learner wants a new one →
+   syllabus skill (`seba new-goal`), not here.
 2. `agenda.briefing` = your memory of this learner: open with one sentence of
    continuity, picking up last session's hint. `subject_style` governs notation
    and drill style, **wins wherever it narrows a rule here**. Honor
@@ -274,61 +274,30 @@ restart from zero (no cards: check skipped).
    `seba abandon GOAL`; never leave a session pending. After `end`, offer
    `seba view GOAL --open`.
 
-## Creating a new goal
-
-1. Ask for goal and **primary source and where it lives** (local
-   markdown/text, PDF, or URL). Read only its **table of contents**; slices
-   fetched while teaching. No source is fine. Seba pre-loads markdown under
-   `$SEBA_DATA_DIR/sources/`; you resolve PDFs and URLs at teach time.
-2. **Find entry point.** Don't trust "total beginner"; probe with two or three
-   concrete tasks at different depths, not a self-rating. What they clearly
-   have → `status: done`. Unsure → `unseen`.
-3. **Draft syllabus YAML yourself** from this schema; do NOT read Seba's source
-   to reverse-engineer it:
-
-   ```yaml
-   goal: Understand introductory probability     # one line
-   subject: probability                           # = --subject
-   concepts:
-     - id: sample-spaces                          # kebab-case, unique
-       name: Sample spaces and events             # human-readable
-       prereqs: []                                # HARD gate: must be done first
-       soft_prereqs: []                           # helpful, never block
-       confusable_with: []                        # mixed up with this; symmetric, declare on either side
-       kc_type: concept                           # fact | concept | procedure | principle
-       sources: []                                # SMALL slices: "blitzstein/ch01.md#1.2" (pre-loaded),
-                                                  # "algebra.pdf p.40-58", "https://…/ch3"; [] = from memory
-       status: unseen                             # "unseen", or "done" if step 2 showed they have it
-       est_sessions: 1                            # 1–3
-     - id: conditional-probability
-       name: Conditional probability and Bayes
-       prereqs: [sample-spaces]                   # may cut across chapter order
-       soft_prereqs: []
-       confusable_with: []
-       kc_type: concept
-       sources: []
-       status: unseen
-       est_sessions: 2
-   ```
-
-   Write out every field. Size concepts to 1–3 sessions; INSERT prerequisites
-   source assumes but doesn't teach.
-4. Get learner's explicit approval of draft — a hard gate.
-5. Write it to a temp file; run `seba new-goal NAME --subject SUBJECT
-   --from-file PATH`. It rejects (read stderr, fix, retry) **duplicate concept
-   ids**, `prereqs`/`soft_prereqs`/`confusable_with` **naming an id not in the
-   file**, or a **cycle** in `prereqs` + `soft_prereqs` together. Bundled
-   subjects: `probability`, `italian`; for a new one, first copy a template
-   from repo's `subjects/_templates/` into `$SEBA_DATA_DIR/subjects/<name>/`.
-
 ## Changing a syllabus
 
 You propose; learner decides. Never drop or steer on your own judgment.
-Mid-session, your two changes: drop (step 5), steer (below). Any other
-change to what goal covers (new source, restore, prerequisites, direction):
-not yours.
-Put it in `--hint` at `seba end` ("learner wants to add <source> — run the
-syllabus skill"); next briefing carries it.
+Mid-session, your three changes: drop (step 5), steer (below), a new source
+(below). Restore, rewiring prerequisites, a change of direction: not yours.
+Put it in `--hint` at `seba end` ("learner wants to restore <concept> — run
+the syllabus skill"); next briefing carries it.
+
+### A new source, mid-session
+
+Learner brings a source during the lesson: get it onto disk and dispatch the
+subagent by the "Reading sources" rules in the seba-syllabus skill — point
+there, don't restate them (fetch to `$SEBA_DATA_DIR/sources/<GOAL>/` first;
+then read `source-reader.md`, beside the syllabus skill, fill the
+placeholders, send it as the Agent prompt with model `sonnet`). You never
+read the source yourself; only its draft comes back. Show the draft,
+get an explicit yes, write its `concepts:` to a temp file, run `seba extend
+GOAL --from-file PATH`: works mid-session, acts at once, doesn't touch the
+pending session; mint on the new concept right away if teaching it now.
+Refused because a prereq in the draft is dropped (named by id) — hand
+restoring it to the syllabus skill (`--hint`), or cut that prereq from the
+draft and retry. Learner wants it taught now: the usual rule for a concept
+mapped this session — `--status started` once the current concept reaches a
+stopping point, on an ordinary day.
 
 ### Steering
 
