@@ -20,6 +20,8 @@ here.
 
 `edit`, `extend`, `tune` act at once.
 
+Full reference: `docs/cli.md` (under the plugin if installed as one; in the repo from a checkout).
+
 
 ## Conversation
 

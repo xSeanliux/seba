@@ -53,34 +53,33 @@ labelled `no-release`. To get it, run
 in the background and asks you to `/reload-plugins`. Remove with
 `claude plugin uninstall seba@seba`. Your learner data is not touched.
 
-### From a checkout (the older way)
+If you installed the older way (a checkout with `make install`), run
+`uv tool uninstall seba` and remove the `~/.claude/skills/seba-tutor` and
+`~/.claude/skills/seba-syllabus` symlinks before installing the plugin: a
+`seba` on your own PATH wins over the plugin's, so the plugin's skill would
+otherwise drive the old CLI.
+
+### Developing
 
 ```bash
 git clone https://github.com/xSeanliux/seba
 cd seba
-make install          # or: ./scripts/install.sh
+uv run seba --help          # the CLI, from the checkout
+claude --plugin-dir .       # loads the checkout as the plugin for one session
 ```
 
-This installs the `seba` CLI (`uv tool install`) and links the `seba-tutor`
-skill into `~/.claude/skills/`. Reverse with `make uninstall` (or
-`./scripts/uninstall.sh`). To update, `git pull` then `make install`. The
-skill is a symlink and so is already live after the pull; the CLI is a copy
-and needs the reinstall, which is what `make install` is for.
-
-Use one or the other. When you switch to the plugin, run `make uninstall`
-first: a `seba` on your own PATH wins over the plugin's, so the plugin's skill
-would drive the old CLI.
+`--plugin-dir .` puts both skills and this checkout's `bin/seba` on the Bash
+tool's PATH for that session only — nothing is installed. `make check` is the
+gate before you push.
 
 ## Use
 
-From any directory, run `claude`, then ask to study — or invoke `/seba:seba-tutor`
-(`/seba-tutor` from a checkout install).
-Claude Code handles the dialogue and calls `seba` for you.
+From any directory, run `claude`, then ask to study — or invoke
+`/seba:seba-tutor`. Claude Code handles the dialogue and calls `seba` for you.
 
 To change what a goal covers (add a paper or chapter, set a concept aside or
 bring it back, change a concept's prerequisites or name, restate the
-direction), ask for it outside a session, or invoke `/seba:seba-syllabus`
-(`/seba-syllabus` from a checkout install).
+direction), ask for it outside a session, or invoke `/seba:seba-syllabus`.
 
 `seba concepts GOAL` prints the curriculum at a glance.
 

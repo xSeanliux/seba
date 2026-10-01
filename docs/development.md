@@ -72,21 +72,8 @@ These commands are **agent-facing**: Claude Code calls them, directed by the
 `seba-tutor` and `seba-syllabus` skills. You rarely run them by hand
 (`seba status` is the exception).
 
-| Command | Purpose |
-|---|---|
-| `seba status` | list goals with due counts |
-| `seba start GOAL [--concept ID]` | begin/resume a session; prints the agenda YAML. `--concept` teaches that concept instead of the usual pick (in progress or on the frontier; refused once a session is pending) |
-| `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record a review grade; `--note` is required on `hard` and `again` |
-| `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create a spaced-repetition card |
-| `seba concept GOAL ID [--status started\|completed\|reopened\|dropped\|restored] [--evidence TEXT] [--note TEXT] [--add-source LOCATOR]` | record concept progress, a note, or a source; `completed` requires `--evidence`; `reopened` is only for a done concept, once the learner has agreed. Drops, restores and sources are applied at `seba end` |
-| `seba extend GOAL --from-file PATH` | append concepts to the goal's syllabus; validated whole, written at once, works with or without a session pending; refuses a new concept whose hard prereq is dropped |
-| `seba edit GOAL ID [--name TEXT] [--add-prereq ID] [--remove-prereq ID] [--add-source LOCATOR] [--status dropped\|restored]` | change one concept between sessions, directed by the `seba-syllabus` skill; prereq and source flags repeat, flags combine. Checked by the same rules as a session's drops and restores, then validated whole (unknown ids, cycles, a live concept on a dropped prereq); written and committed at once as `<goal>: edited <id>`, one printed line per change. Refused while a session is pending, since `seba end` replays that session's record onto the file |
-| `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more] [--direction TEXT]` | no flags: print the goal's direction, settings and emphasis; with flags: change them. `--direction` is written at once. Works during a session, but the session's review list and follow-on concepts were fixed at `seba start`: emphasis `more` and `--concepts-per-session` show from the next session. Retention, the interval ceiling and emphasis take effect at each card's next review, including cards graded later in this session. `--retention` (default 0.9, py-fsrs's own) is bounded by design to 0.70–0.97: at retention r about 1 − r of reviews are lapses, so below 0.70 a third or more of reviews are lapses and relearning dominates the workload; above 0.97 the intervals shrink so far that the workload grows steeply for little extra recall. Both bounds sit inside the range Anki accepts for FSRS desired retention (0.70 to 0.99). `--completion-passes` (default 1) is the number of distinct sessions, later than the one where the concept was started or reopened, in which one of its cards came back `good` or `easy`, before `completed` is allowed: a pass is per session, not per card, and `good` counts as well as `easy` |
-| `seba end GOAL --summary TEXT --hint TEXT` | close the session |
-| `seba abandon GOAL [--discard]` | quit early: save as INCOMPLETE (or discard) |
-| `seba new-goal NAME --subject SUBJECT --from-file PATH` | create a goal from a drafted syllabus YAML |
-| `seba concepts GOAL [--grep TEXT]` | list concepts, one per line: id, status, name, hard prereqs; `direction:` line first, then `session: in progress` while a session is pending, `frontier:` line last. `--grep`: only concepts whose id or name contains TEXT (case-insensitive). Read-only |
-| `seba view GOAL [--json] [--open]` | render the goal's dependency graph + card status to HTML; `--json` prints the data blob instead, `--open` shows it in the browser |
+Full reference, generated from the code: [`docs/cli.md`](cli.md) (run
+`make docs-gen` to regenerate after changing `src/seba/cli.py`).
 
 ## Data directory layout
 

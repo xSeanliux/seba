@@ -17,4 +17,5 @@ jobs:
       - run: make lint
       - run: make fmt
       - run: make typecheck
+      - run: make docs-check
       - run: make test
