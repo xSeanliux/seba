@@ -20,6 +20,11 @@ Existing concepts (id: name), reuse an id instead of inventing a twin:
 
 Read the whole of this source, not a summary of it: {{SOURCE}}{{SLICE}}
 
+`{{SOURCE}}` is a local path on disk, or a URL when it couldn't be fetched.
+When it's a local path, write `sources:` locators relative to
+`$SEBA_DATA_DIR/sources/` — not the path you were given — e.g.
+`<GOAL>/smith2024.pdf p.3-7`. When it's a URL, use that URL as the locator.
+
 Draft, and return nothing else:
 
 ```yaml
@@ -30,7 +35,7 @@ concepts:
     soft_prereqs: []
     confusable_with: []
     kc_type: concept   # fact | concept | procedure | principle
-    sources: ["locator p.40-58"]   # slices you actually read, this form
+    sources: ["<GOAL>/smith2024.pdf p.3-7"]   # slices you actually read, this form
     status: unseen
     est_sessions: 1     # 1-3
 assumed_background:

@@ -40,14 +40,32 @@ Full reference: `docs/cli.md` (under the plugin if installed as one; in the repo
 
 ## Reading sources
 
-Shared by "Adding a source" and "Creating a new goal" below.
+Shared by "Adding a source" and "Creating a new goal" below, and by the
+tutor's mid-session new-source path.
 
+- **Get it onto disk first**, under `$SEBA_DATA_DIR/sources/<GOAL>/`, named
+  plainly (`smith2024.pdf`, `ch03.md`): a URL → `curl -L -o` (PDF or page); a
+  local file → copy it; a web page worth keeping as text → save it as `.md`,
+  so `seba start` can pre-load slices of it later the same way it does for
+  any other markdown source. Skip anything over ~50MB and keep the URL as the
+  locator instead — `$SEBA_DATA_DIR` is a git repo, `seba end` commits
+  everything under it, and a large PDF would land in that history; accepted
+  for a normal paper or chapter, not worth it past that size.
+  Can't fetch it (paywall, login, interactive site) → keep the URL as the
+  locator and say so to the learner; the tutor fetches the bounded slice at
+  teach time, same as it already does for a URL source.
+  `seba view --json` and `seba concepts` don't list files — the
+  `sources/<GOAL>/` folder is the inventory; tell the learner where it is.
 - One source, one subagent: read `source-reader.md` (beside the syllabus
   skill), fill the placeholders, send it as the Agent prompt with model
   `sonnet`, one agent per source or slice, in parallel. Under the plugin the
-  file is inside the bundle; from a checkout it is in the repo. `{{EXISTING}}`
-  is the ids and names from `seba concepts GOAL`, or "none" for a new goal.
-  You never read the source yourself — only its draft comes back.
+  file is inside the bundle; from a checkout it is in the repo. `{{SOURCE}}`
+  is the local path on disk (not the URL) when fetched — the agent writes
+  `sources:` locators relative to `$SEBA_DATA_DIR/sources/`, e.g.
+  `<GOAL>/smith2024.pdf p.3-7`; a source that couldn't be fetched keeps its
+  URL as `{{SOURCE}}` and as the locator. `{{EXISTING}}` is the ids and names
+  from `seba concepts GOAL`, or "none" for a new goal. You never read the
+  source yourself — only its draft comes back.
 - Big source — a book, or anything past a few chapters — first: read its
   table of contents yourself, or with one agent. Then split it: one agent per
   chapter group, the grouping decided from the table of contents, each a

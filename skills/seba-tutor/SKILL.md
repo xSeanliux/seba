@@ -284,13 +284,12 @@ the syllabus skill"); next briefing carries it.
 
 ### A new source, mid-session
 
-Learner brings a source during the lesson: read `source-reader.md` (beside
-the syllabus skill), fill the placeholders, send it as the Agent prompt with
-model `sonnet`, one agent per source or slice, in parallel. Under the plugin
-the file is inside the bundle; from a checkout it is in the repo. Merge what
-comes back by the "Reading sources" rules in the seba-syllabus skill — point
-there, don't restate them. You never read the source yourself; only its
-draft comes back. Show the draft,
+Learner brings a source during the lesson: get it onto disk and dispatch the
+subagent by the "Reading sources" rules in the seba-syllabus skill — point
+there, don't restate them (fetch to `$SEBA_DATA_DIR/sources/<GOAL>/` first;
+then read `source-reader.md`, beside the syllabus skill, fill the
+placeholders, send it as the Agent prompt with model `sonnet`). You never
+read the source yourself; only its draft comes back. Show the draft,
 get an explicit yes, write its `concepts:` to a temp file, run `seba extend
 GOAL --from-file PATH`: works mid-session, acts at once, doesn't touch the
 pending session; mint on the new concept right away if teaching it now.
