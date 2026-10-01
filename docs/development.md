@@ -73,7 +73,7 @@ These commands are **agent-facing**: Claude Code calls them, directed by the
 (`seba status` is the exception).
 
 Full reference, generated from the code: [`docs/cli.md`](cli.md) (run
-`make docs` to regenerate after changing `src/seba/cli.py`).
+`make docs-gen` to regenerate after changing `src/seba/cli.py`).
 
 ## Data directory layout
 
