@@ -2,6 +2,8 @@
 
 # `seba`
 
+A long-term personal tutor: spaced review and guided teaching for goals that span many sessions. Each command is one step, reading and writing state in $SEBA_DATA_DIR (default ~/seba-data), its own git repository. Driven by the seba-tutor and seba-syllabus Claude Code skills; seba status is the one command run by hand.
+
 **Usage**:
 
 ```console
@@ -16,21 +18,35 @@ $ seba [OPTIONS] COMMAND [ARGS]...
 
 **Commands**:
 
-* `new-goal`
-* `extend`
-* `edit`: Change one concept between sessions;...
-* `status`
-* `start`
-* `grade`
-* `mint`
-* `concept`
-* `end`
-* `abandon`
-* `view`
-* `concepts`: Print the goal&#x27;s direction; one line per...
-* `tune`
+* `new-goal`: Create a goal from a syllabus drafted in...
+* `extend`: Append learner-approved concepts to a...
+* `edit`: Change one concept&#x27;s name, hard...
+* `status`: List every goal with its session count and...
+* `start`: Begin today&#x27;s session, or resume one...
+* `grade`: Record a review grade for one card, as its...
+* `mint`: Create one spaced-repetition card for a...
+* `concept`: Record a concept&#x27;s progress, a note, or a...
+* `end`: Close the session and save it.
+* `abandon`: End a session the learner quit early,...
+* `view`: Render the goal&#x27;s dependency graph and...
+* `concepts`: List the goal&#x27;s curriculum: direction,...
+* `tune`: Show or change a goal&#x27;s settings, one...
 
 ## `seba new-goal`
+
+Create a goal from a syllabus drafted in conversation.
+
+Used by the syllabus skill, once, to set up a goal; never run mid-session.
+Reads the subject profile and the syllabus file. Writes the goal&#x27;s
+directory (goal.yaml, syllabus.yaml, items.jsonl, notes.md) and commits
+&quot;&lt;name&gt;: created&quot;. Prints a line confirming the goal and how to start it.
+
+Refuses:
+- no subject profile &#x27;&lt;subject&gt;&#x27; — create &lt;dir&gt;/profile.yaml (copy from
+  &lt;repo&gt;/subjects/_templates/)
+- &lt;file&gt;: &lt;detail&gt; — the syllabus file does not parse or validate
+  (duplicate concept ids, a prereq/soft_prereq/confusable_with naming an
+  id not in the file, or a prereq/soft_prereq cycle)
 
 **Usage**:
 
@@ -44,11 +60,34 @@ $ seba new-goal [OPTIONS] NAME
 
 **Options**:
 
-* `--subject TEXT`: [required]
-* `--from-file FILE`: syllabus YAML drafted in conversation  [required]
+* `--subject TEXT`: an existing subject profile&#x27;s name  [required]
+* `--from-file FILE`: syllabus YAML drafted in conversation: goal, subject and concepts  [required]
 * `--help`: Show this message and exit.
 
 ## `seba extend`
+
+Append learner-approved concepts to a goal&#x27;s syllabus.
+
+Used by the syllabus skill, drafting concepts for a new source; or by the
+tutor mid-session, for a gap found while teaching. Reads the syllabus on
+disk and, if a session is pending, that session&#x27;s recorded concept
+changes, so a new concept is judged against the syllabus as the session
+has changed it. Writes syllabus.yaml and commits &quot;&lt;goal&gt;: extended
+(+&lt;n&gt;)&quot;. Prints the added ids. Acts at once; never touches the pending
+session.
+
+Refuses:
+- no such goal: &#x27;&lt;goal&gt;&#x27;
+- &lt;file&gt;: holds no concepts — expected a list of concepts, or a mapping
+  with a &#x27;concepts:&#x27; list
+- &lt;file&gt;: concept ids already in the syllabus: [&lt;ids&gt;]
+- &lt;file&gt;: concept ids repeated in the file: [&lt;ids&gt;]
+- &lt;file&gt;: new concept &#x27;&lt;id&gt;&#x27; has status &lt;status&gt;; a new concept is
+  unseen, or done if the learner already has it
+- &lt;file&gt;: new concept &#x27;&lt;id&gt;&#x27; depends on &lt;ids&gt;, which is dropped —
+  restore that first
+- &lt;file&gt;: &lt;detail&gt; — the file does not parse, or a concept fails
+  validation
 
 **Usage**:
 
@@ -62,12 +101,46 @@ $ seba extend [OPTIONS] GOAL
 
 **Options**:
 
-* `--from-file FILE`: concepts YAML to add, drafted in conversation  [required]
+* `--from-file FILE`: concepts to add: a bare list, or a mapping with a &#x27;concepts:&#x27; list  [required]
 * `--help`: Show this message and exit.
 
 ## `seba edit`
 
-Change one concept between sessions; written and committed at once.
+Change one concept&#x27;s name, hard prerequisites, sources, or dropped
+status, between sessions.
+
+Used by the learner through the syllabus skill. Reads the syllabus on
+disk. Writes syllabus.yaml and commits &quot;&lt;goal&gt;: edited &lt;concept_id&gt;&quot;,
+unless nothing changed. Prints one line per change (name, prereq added or
+removed, source added, status), or &quot;nothing changed&quot;. Flags combine; give
+at least one.
+
+Refuses:
+- a session is in progress for &#x27;&lt;goal&gt;&#x27; — end or abandon it before
+  editing the syllabus
+- no such goal: &#x27;&lt;goal&gt;&#x27;
+- nothing to edit — give --name, --add-prereq, --remove-prereq,
+  --add-source or --status
+- --name needs text
+- --status must be dropped or restored
+- unknown concept: &#x27;&lt;concept_id&gt;&#x27;
+- &#x27;&lt;concept_id&gt;&#x27; does not depend on &lt;id&gt; — --remove-prereq names an edge
+  that is not there
+- &#x27;&lt;concept_id&gt;&#x27; cannot depend on itself — --add-prereq names itself
+- &#x27;&lt;concept_id&gt;&#x27; already depends on &lt;id&gt; — --add-prereq names an edge
+  already there
+- concept &#x27;&lt;concept_id&gt;&#x27; has unknown prereqs: [&lt;ids&gt;] — --add-prereq
+  names a concept id that does not exist
+- cannot drop &#x27;&lt;concept_id&gt;&#x27;: &lt;ids&gt; depend on it — drop them first, or
+  remove the edge with seba edit --remove-prereq
+- &#x27;&lt;concept_id&gt;&#x27; is already dropped
+- &#x27;&lt;concept_id&gt;&#x27; is &lt;status&gt;; only a dropped concept can be restored
+- cannot restore &#x27;&lt;concept_id&gt;&#x27;: it depends on &lt;ids&gt;, which is dropped —
+  restore that first
+- concept &#x27;&lt;concept_id&gt;&#x27; depends on &lt;ids&gt;, which is dropped — restore
+  that first — a prerequisite added in this same call is dropped
+
+Acts at once.
 
 **Usage**:
 
@@ -83,13 +156,19 @@ $ seba edit [OPTIONS] GOAL CONCEPT_ID
 **Options**:
 
 * `--name TEXT`: the concept&#x27;s new name
-* `--add-prereq TEXT`: a hard prerequisite to add; repeatable
-* `--remove-prereq TEXT`: a hard prerequisite to remove; repeatable
+* `--add-prereq TEXT`: a hard prerequisite (concept id) to add; repeatable
+* `--remove-prereq TEXT`: a hard prerequisite (concept id) to remove; repeatable
 * `--add-source TEXT`: a locator to add to its sources; repeatable
-* `--status TEXT`: dropped|restored
+* `--status TEXT`: dropped or restored
 * `--help`: Show this message and exit.
 
 ## `seba status`
+
+List every goal with its session count and how many cards are due today.
+
+Used by anyone, any time; the one command run outside a skill. Reads
+every goal under $SEBA_DATA_DIR. Writes nothing. Prints &quot;no goals yet&quot;,
+or one line per goal: name, subject, sessions so far, cards due today.
 
 **Usage**:
 
@@ -103,6 +182,29 @@ $ seba status [OPTIONS]
 
 ## `seba start`
 
+Begin today&#x27;s session, or resume one already in progress.
+
+Used by the tutor, once per session, before doing anything else. Reads
+the goal&#x27;s state and builds today&#x27;s agenda (what&#x27;s due, what to teach)
+if none is pending; resuming prints &quot;(resuming session in progress)&quot;
+instead. Writes session.pending.yaml. Prints the agenda as YAML:
+`agenda`, `subject_style`, `already_graded`, `ungraded_reviews`,
+`minted_so_far`, `concept_calls_so_far`.
+
+Refuses:
+- no such goal: &#x27;&lt;goal&gt;&#x27;
+- a session is already in progress for &#x27;&lt;goal&gt;&#x27; — end or abandon it
+  before choosing a concept — only when --concept is given and a session
+  is already pending
+- &#x27;&lt;concept&gt;&#x27; is dropped; restore it first
+- &#x27;&lt;concept&gt;&#x27; is done; reopen it if the learner wants it taught again
+- &#x27;&lt;concept&gt;&#x27; is not ready: &lt;ids&gt; must be done first — a hard
+  prerequisite is not yet done
+- unknown concept: &#x27;&lt;concept&gt;&#x27;
+
+`--concept` is refused once a session is pending; start a new session to
+use it.
+
 **Usage**:
 
 ```console
@@ -115,10 +217,26 @@ $ seba start [OPTIONS] GOAL
 
 **Options**:
 
-* `--concept TEXT`: teach this concept today instead of the usual pick
+* `--concept TEXT`: teach this concept instead of the usual pick; must be in progress or on the frontier
 * `--help`: Show this message and exit.
 
 ## `seba grade`
+
+Record a review grade for one card, as its exchange resolves.
+
+Used by the tutor, immediately after each review item in `seba start`&#x27;s
+`agenda.review_items`. Grade is again, hard, good, easy or skipped: skip
+only an item the session never reached, or whose concept was dropped this
+session. Reads this session&#x27;s pending record. Writes
+session.pending.yaml. Prints &quot;recorded&quot;.
+
+Refuses:
+- no session in progress for &#x27;&lt;goal&gt;&#x27; — run: seba start &lt;goal&gt;
+- &#x27;&lt;item_id&gt;&#x27; is not in this session&#x27;s review items
+- &#x27;&lt;item_id&gt;&#x27; already graded
+- &#x27;&lt;item_id&gt;&#x27; belongs to &#x27;&lt;concept&gt;&#x27;, which is dropped — grade it skipped
+- grading &#x27;&lt;grade&gt;&#x27; requires --note saying what went wrong (again) or
+  what the help was for (hard)
 
 **Usage**:
 
@@ -134,10 +252,23 @@ $ seba grade [OPTIONS] GOAL ITEM_ID GRADE
 
 **Options**:
 
-* `--note TEXT`
+* `--note TEXT`: required for again or hard: what went wrong or what the help was for
 * `--help`: Show this message and exit.
 
 ## `seba mint`
+
+Create one spaced-repetition card for a concept.
+
+Used by the tutor, mid-session, for material worth retaining a month —
+the transfer version of a problem, not the one just worked. Reads this
+session&#x27;s pending record to check the per-session mint budget. Writes
+session.pending.yaml. Prints &quot;minted&quot;.
+
+Refuses:
+- no session in progress for &#x27;&lt;goal&gt;&#x27; — run: seba start &lt;goal&gt;
+- mint budget reached (&lt;n&gt; this session); review capacity is &lt;m&gt;/session
+- unknown concept: &#x27;&lt;concept&gt;&#x27;
+- &#x27;&lt;concept&gt;&#x27; is dropped; restore it before minting a card for it
 
 **Usage**:
 
@@ -151,13 +282,47 @@ $ seba mint [OPTIONS] GOAL
 
 **Options**:
 
-* `--concept TEXT`: [required]
-* `--type TEXT`: [required]
-* `--front TEXT`: [required]
-* `--back TEXT`: [required]
+* `--concept TEXT`: the concept this card belongs to  [required]
+* `--type TEXT`: the card&#x27;s item type, e.g. recall or apply  [required]
+* `--front TEXT`: the question side  [required]
+* `--back TEXT`: the answer side  [required]
 * `--help`: Show this message and exit.
 
 ## `seba concept`
+
+Record a concept&#x27;s progress, a note, or a source, during a session.
+
+Used by the tutor, as teaching happens: --status started when teaching
+begins, --status completed once the delayed check passes, a note for a
+misconception or strength. `dropped`, `restored` and `--add-source` are
+recorded now but only take effect in the syllabus at `seba end`; `started`
+and `completed` take effect at once, since later calls in the same
+session (passes, a repeat teach) depend on them. Reads this session&#x27;s
+pending record and the syllabus as it stands with that record replayed.
+Writes session.pending.yaml. Prints &quot;recorded&quot;, &quot;recorded (no cards for
+this concept, so the delayed check was skipped)&quot; for a completion with no
+cards, or the matching refusal.
+
+Refuses:
+- no session in progress for &#x27;&lt;goal&gt;&#x27; — run: seba start &lt;goal&gt;
+- unknown concept: &#x27;&lt;concept_id&gt;&#x27;
+- --add-source needs a locator
+- &#x27;&lt;locator&gt;&#x27; is already a source of &#x27;&lt;concept_id&gt;&#x27;
+- &#x27;&lt;concept_id&gt;&#x27; is dropped; restore it first — started, completed or
+  reopened on a dropped concept
+- &#x27;&lt;concept_id&gt;&#x27; is &lt;status&gt;; only a done concept can be reopened
+- &#x27;&lt;concept_id&gt;&#x27; is done; reopening it is the learner&#x27;s decision — if
+  they agree, use --status reopened
+- &#x27;&lt;concept_id&gt;&#x27; is not ready: &lt;ids&gt; must be done first — started on an
+  unseen concept with an undone hard prerequisite
+- completing a concept requires --evidence: name the specific exchange in
+  this session that demonstrated the learner has it
+- &#x27;&lt;concept_id&gt;&#x27; has &lt;n&gt; of &lt;m&gt; unaided pass(es) in a later session; each
+  is a good/easy review of one of its cards, in a session after the one
+  where teaching started or the concept was reopened
+
+`dropped`, `restored` and a source added here apply at `seba end`;
+`started`, `completed` and `reopened` apply at once.
 
 **Usage**:
 
@@ -172,13 +337,29 @@ $ seba concept [OPTIONS] GOAL CONCEPT_ID
 
 **Options**:
 
-* `--status TEXT`: started|completed|reopened|dropped|restored
-* `--note TEXT`
+* `--status TEXT`: started, completed, reopened, dropped or restored
+* `--note TEXT`: a durable note: a misconception (prefix MISCONCEPTION:) or strength
 * `--evidence TEXT`: required with --status completed: the exchange that showed it
 * `--add-source TEXT`: a locator to add to the concept&#x27;s sources
 * `--help`: Show this message and exit.
 
 ## `seba end`
+
+Close the session and save it.
+
+Applies the session&#x27;s drops, restores and added sources to the syllabus
+and folds its grades into the schedule. Used by the tutor, once, after
+every review is graded. Reads this
+session&#x27;s pending record and the goal&#x27;s state. Writes the session&#x27;s files
+(summary, outcomes, transcript) and the updated syllabus.yaml and
+items.jsonl, commits &quot;&lt;goal&gt;: session &lt;n&gt;&quot;, and deletes
+session.pending.yaml. Prints a receipt of what the session recorded.
+
+Refuses:
+- no session in progress for &#x27;&lt;goal&gt;&#x27; — run: seba start &lt;goal&gt;
+- session already ended
+- cannot end: ungraded review items: &lt;ids&gt;. Grade each (or grade as
+  &#x27;skipped&#x27;) first.
 
 **Usage**:
 
@@ -192,11 +373,25 @@ $ seba end [OPTIONS] GOAL
 
 **Options**:
 
-* `--summary TEXT`: [required]
-* `--hint TEXT`: [required]
+* `--summary TEXT`: 3-6 sentences on what happened  [required]
+* `--hint TEXT`: a concrete procedure and stopping rule for next session  [required]
 * `--help`: Show this message and exit.
 
 ## `seba abandon`
+
+End a session the learner quit early, without a summary or hint.
+
+Used by the tutor when the learner stops abruptly; never leave a session
+pending. By default, saves what was recorded as an INCOMPLETE session, the
+same as `seba end` otherwise. With --discard, throws away everything
+recorded this session instead: no grades, cards or concept changes reach
+disk. Reads this session&#x27;s pending record. Writes the session&#x27;s files
+(with --discard, nothing) and deletes session.pending.yaml. Prints a
+receipt of what was discarded, or (without --discard) the same receipt
+`seba end` prints.
+
+Refuses:
+- no session in progress for &#x27;&lt;goal&gt;&#x27; — run: seba start &lt;goal&gt;
 
 **Usage**:
 
@@ -215,6 +410,17 @@ $ seba abandon [OPTIONS] GOAL
 
 ## `seba view`
 
+Render the goal&#x27;s dependency graph and card status.
+
+Used by anyone, any time, usually after `seba end`. Reads the goal&#x27;s
+state. Writes nothing but the rendered file itself:
+goals/&lt;goal&gt;/view.html, overwritten each run, never committed. With
+--json, prints the view&#x27;s data instead of writing that file. Prints the
+path to the written file, unless --json.
+
+Refuses:
+- no such goal: &#x27;&lt;goal&gt;&#x27;
+
 **Usage**:
 
 ```console
@@ -227,14 +433,24 @@ $ seba view [OPTIONS] GOAL
 
 **Options**:
 
-* `--json`: print the data blob instead of writing HTML
-* `--open`: open the rendered view
+* `--json`: print the view&#x27;s data as JSON instead of writing HTML
+* `--open`: open the written HTML file in the browser
 * `--help`: Show this message and exit.
 
 ## `seba concepts`
 
-Print the goal&#x27;s direction; one line per concept (id, status, name,
-hard prerequisites, `dropped from`); then the frontier.
+List the goal&#x27;s curriculum: direction, every concept, and the frontier.
+
+Used by anyone, any time, to look up a concept id or check what is ready.
+Read-only: reads the goal&#x27;s syllabus and writes nothing. Prints a
+&quot;direction:&quot; line; &quot;session: in progress&quot; if a session is pending (`seba
+edit` refuses until it ends); one line per concept — id, status, name,
+&quot;prereqs: ...&quot; if it has hard prerequisites, &quot;dropped from: &lt;status&gt;&quot; if
+dropped; then a &quot;frontier:&quot; line listing the concepts ready to teach.
+--grep limits the concept lines to those whose id or name contains TEXT.
+
+Refuses:
+- no such goal: &#x27;&lt;goal&gt;&#x27;
 
 **Usage**:
 
@@ -248,10 +464,39 @@ $ seba concepts [OPTIONS] GOAL
 
 **Options**:
 
-* `--grep TEXT`: only concepts whose id or name contains TEXT
+* `--grep TEXT`: only concepts whose id or name contains TEXT (case-insensitive)
 * `--help`: Show this message and exit.
 
 ## `seba tune`
+
+Show or change a goal&#x27;s settings, one concept&#x27;s emphasis, or its
+direction.
+
+Used by the learner, through either skill, usually between sessions, but
+also mid-session for a direct ask (&quot;review bayes more&quot;). With no flags,
+reads and prints the goal&#x27;s direction, settings and non-default emphasis;
+with any flag, changes what it names. Reads the goal&#x27;s state. Writes
+goal.yaml and items.jsonl (only emphasis `more` touches cards, moving
+them to due now) and commits &quot;&lt;goal&gt;: tuned&quot;, unless nothing changed.
+Prints what changed, one line per setting, or &quot;nothing changed&quot;.
+
+Refuses:
+- no such goal: &#x27;&lt;goal&gt;&#x27;
+- --retention must be between 0.7 and 0.97
+- --max-interval must be at least 1
+- --concepts-per-session must be between 1 and 5
+- --completion-passes must be at least 1
+- --direction needs text
+- --concept and --emphasis go together — one given without the other
+- unknown concept: &#x27;&lt;concept&gt;&#x27;
+- --emphasis must be one of: less, normal, more
+
+`--retention`, the interval ceiling and emphasis apply at each card&#x27;s next
+review, including later in a session already under way; emphasis `more`
+also makes that concept&#x27;s cards due now. `--concepts-per-session` and a
+changed emphasis otherwise show from the next session: the current
+session&#x27;s review list and follow-on concepts were fixed at `seba start`.
+`--direction` is written at once.
 
 **Usage**:
 
@@ -265,11 +510,11 @@ $ seba tune [OPTIONS] GOAL
 
 **Options**:
 
-* `--retention FLOAT`
-* `--max-interval INTEGER`
-* `--concepts-per-session INTEGER`
-* `--completion-passes INTEGER`
-* `--concept TEXT`
-* `--emphasis TEXT`: less|normal|more
+* `--retention FLOAT`: desired retention, 0.70 to 0.97 (default 0.9); lower means longer intervals
+* `--max-interval INTEGER`: longest gap between reviews, in days (default 180)
+* `--concepts-per-session INTEGER`: how many concepts a session may teach, 1 to 5 (default 1)
+* `--completion-passes INTEGER`: later sessions a concept&#x27;s cards must pass before it can complete, at least 1 (default 1)
+* `--concept TEXT`: the concept whose emphasis to change; needs --emphasis
+* `--emphasis TEXT`: less, normal or more
 * `--direction TEXT`: what the goal is for, as the learner now puts it
 * `--help`: Show this message and exit.
