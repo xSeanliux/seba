@@ -26,9 +26,13 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'no-release')
     runs-on: ubuntu-latest
     steps:
+      # The push to main goes over SSH with a write deploy key, which the
+      # "Main must be PR'd" ruleset lets through. GITHUB_TOKEN cannot: on a
+      # user-owned repo the Actions app cannot be a ruleset bypass actor.
       - uses: actions/checkout@v5
         with:
           ref: main
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - uses: astral-sh/setup-uv@v6
 
@@ -48,7 +52,6 @@ jobs:
           # commit is attributed to the bot.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # A push made with GITHUB_TOKEN starts no other workflow run, so CI
-          # does not run again on the release commit. That is fine: CI already
-          # passed on the pull request, and this commit only changes the version.
+          # The deploy-key push does start the CI workflow on the release
+          # commit; that is harmless, and gh release create still uses GH_TOKEN.
           scripts/release.sh "$part"
