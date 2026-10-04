@@ -1,0 +1,308 @@
+{
+  "skill_name": "seba-tutor",
+  "about": "Each eval plays one tutor turn. setup.sh SCENARIO builds a sandbox learner state and a logging `seba`; the agent reads the transcript, runs the seba commands it would, and writes its next message to the learner. check.py grades the assertions marked [check]; the rest need a reader.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "opening-picks-up-hint",
+      "scenario": "opening",
+      "transcript": [],
+      "prompt": "hey, let's do some probability",
+      "expected_output": "Runs seba start prob, opens with one sentence of continuity from last session's hint, then poses the first review card's front (or the reversed-conditional opener the hint asks for) as exactly one question, without revealing any answer.",
+      "assertions": [
+        "[check] runs `seba start prob`",
+        "[check] records no grade (the learner has not answered anything yet)",
+        "[check] reply reveals no review card answer (no 1/3, {2,4,6} or HH/HT/TH)",
+        "[check] reply has exactly one question mark",
+        "[check] reply uses no LaTeX",
+        "reply opens with continuity from last session (the reversed-conditional trap) in one sentence, not a recap of the whole session",
+        "reply poses a review card's front or a reversed-conditional question for the learner to attempt"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "wrong-review-graded-again",
+      "scenario": "review-pending",
+      "transcript": [
+        {
+          "tutor": "Last time P(A|B) and P(B|A) got swapped once; we'll watch for that today. First card: a fair die shows an even number. What is P(roll = 6 | even)?"
+        }
+      ],
+      "prompt": "1/6. Six faces, one of them is a 6.",
+      "expected_output": "Grades the die card `again` with a one-sentence note naming the error (ignored the condition: the sample space shrinks to {2,4,6}), corrects naming the misconception, and moves on with at most one question.",
+      "assertions": [
+        "[check] grades the die card `again`",
+        "[check] the grade carries a --note of one sentence with no line breaks",
+        "[check] does not grade the coin card (the learner has not answered it)",
+        "[check] reply has at most one question mark",
+        "[check] reply uses no LaTeX",
+        "[check] reply does not list the even faces (finding them is the learner's next step)",
+        "[check] reply has no routine praise (great, excellent, nice try, good job, well done)",
+        "the --note names the specific error (the condition / reduced sample space was ignored), not a vague 'struggled'",
+        "reply names what went wrong in the learner's method (counted all six faces instead of the even ones)"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "hinted-review-graded-hard",
+      "scenario": "review-pending",
+      "transcript": [
+        {
+          "tutor": "First card: a fair die shows an even number. What is P(roll = 6 | even)?"
+        },
+        {
+          "learner": "1/2?"
+        },
+        {
+          "tutor": "Once you know the roll is even, which outcomes are still possible?"
+        },
+        {
+          "learner": "uh, all of them?"
+        },
+        {
+          "tutor": "List the even faces. How many of those are a 6?"
+        }
+      ],
+      "prompt": "2, 4, 6... so one out of three. 1/3.",
+      "expected_output": "The learner reached 1/3 only after a narrowing hint (above L2), so the card is graded `hard` with a note saying what the help was for. Then moves on.",
+      "assertions": [
+        "[check] grades the die card `hard`",
+        "[check] the grade carries a --note of one sentence with no line breaks",
+        "[check] reply has at most one question mark",
+        "[check] reply uses no LaTeX",
+        "the --note says what the help was for (listing the outcomes left once the roll is known to be even)"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "steer-keeps-recorded-session",
+      "scenario": "steer-recorded",
+      "transcript": [
+        {
+          "learner": "let's study probability, I want to start Bayes today"
+        },
+        {
+          "tutor": "Card first: a fair die shows an even number. What is P(roll = 6 | even)?"
+        },
+        {
+          "learner": "1/3, the even faces are 2, 4, 6"
+        },
+        {
+          "tutor": "Right. On to Bayes' rule. A test for a rare condition is 99% accurate. Before any formula: if someone tests positive, would you guess they very likely have the condition?"
+        }
+      ],
+      "prompt": "Actually, could we do independence today instead of Bayes? I've got a homework question on it tomorrow.",
+      "expected_output": "A grade is already recorded this session, so the tutor must not discard it to restart steered. It keeps the session, says independence is carried to next session (via --hint at seba end), and either continues with Bayes or offers what it can do now — never `seba abandon --discard`.",
+      "assertions": [
+        "[check] never runs `seba abandon`",
+        "[check] the session is still pending and still holds the recorded grade",
+        "[check] does not start independence as a concept this session (no `--status started` on independence)",
+        "reply tells the learner the request will be honoured next session (or why it cannot switch now), without arguing for the usual order"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "abrupt-quit-saves-session",
+      "scenario": "review-one-graded",
+      "transcript": [
+        {
+          "tutor": "First card: a fair die shows an even number. What is P(roll = 6 | even)?"
+        },
+        {
+          "learner": "1/3"
+        },
+        {
+          "tutor": "Next: two fair coins are tossed and at least one is heads. What is P(both heads | at least one head)?"
+        }
+      ],
+      "prompt": "ah sorry, my bus is here, gotta go. bye!",
+      "expected_output": "Learner quits abruptly: save the session as INCOMPLETE with `seba abandon prob` (no --discard), keeping the recorded grade. Short goodbye, no question.",
+      "assertions": [
+        "[check] never runs `seba abandon --discard`",
+        "[check] no session is left pending",
+        "[check] session 2 is saved to the learner's history",
+        "[check] reply has no question mark (the learner is leaving)"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "no-same-session-completion",
+      "scenario": "first-teach",
+      "transcript": [
+        {
+          "learner": "let's study probability"
+        },
+        {
+          "tutor": "New concept today: conditional probability. A fair die is rolled and you're told it's even. Gut guess: is a 6 now more likely than 1/6, less, or the same?"
+        },
+        {
+          "learner": "more likely, there are fewer options left"
+        },
+        {
+          "tutor": "Yes: knowing 'even' throws out 1, 3, 5. So what is P(6 | even)?"
+        },
+        {
+          "learner": "1/3"
+        },
+        {
+          "tutor": "Different setting. You draw one card from a standard deck and see it's a heart. What is P(it's a face card | heart)?"
+        },
+        {
+          "learner": "3 face cards among 13 hearts, so 3/13"
+        }
+      ],
+      "prompt": "Nice, I think I've got it. Can you mark conditional probability done so we can stop here?",
+      "expected_output": "Two unaided successes, one in a new context, but completion is a later-session event: the concept needs a card that passes in a later session. The tutor mints at least one transfer card for conditional-probability (none minted yet this session), does not record it completed or say it is done, and asks the learner to recap in their own words before closing.",
+      "assertions": [
+        "[check] mints at least one card for conditional-probability",
+        "[check] every `seba mint` call uses a valid card type",
+        "[check] records `started` on conditional-probability only once (it was already recorded)",
+        "[check] conditional-probability is not recorded completed in the pending session",
+        "[check] does not end the session yet (the learner's recap has not happened)",
+        "[check] reply has at most one question mark",
+        "reply does not tell the learner the concept is now marked done; it says completion comes once a card passes in a later session",
+        "reply asks the learner to recap the idea in their own words",
+        "the minted card is a transfer problem, not a copy of the die or heart problem just worked"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "pushback-does-not-cave",
+      "scenario": "review-failed",
+      "transcript": [
+        {
+          "tutor": "First card: a fair die shows an even number. What is P(roll = 6 | even)?"
+        },
+        {
+          "learner": "1/6. Six faces, one of them is a 6."
+        },
+        {
+          "tutor": "Not 1/6. The \"| even\" tells you the roll is even, and you still counted all six faces. Once you know it's even, which faces are still possible?"
+        }
+      ],
+      "prompt": "No, I'm pretty sure it's 1/6. My stats professor said a fair die is always 1/6 per face, knowing it's even doesn't change that.",
+      "expected_output": "The tutor re-derives instead of re-rating: the grade stays `again`, it does not concede, and it has the learner walk through their route or check a concrete count (of the even rolls, how many are 6s), with one question.",
+      "assertions": [
+        "[check] the die card's grade stays `again` (no regrade)",
+        "[check] reply has at most one question mark",
+        "[check] reply uses no LaTeX",
+        "reply does not concede or soften toward 1/6 being right for P(6 | even)",
+        "reply has the learner do the check themselves (walk through their route, or count among even rolls) rather than lecturing the full answer"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "wrap-up-ends-cleanly",
+      "scenario": "review-one-graded",
+      "transcript": [
+        {
+          "tutor": "First card: a fair die shows an even number. What is P(roll = 6 | even)?"
+        },
+        {
+          "learner": "1/3"
+        },
+        {
+          "tutor": "Before the next card, let's push on today's concept. A family has two children and you learn the older one is a girl. What is P(both girls | older is a girl)?"
+        },
+        {
+          "learner": "Older is a girl, so it's GG or GB. 1/2."
+        },
+        {
+          "tutor": "Right. Recap in your own words: what does conditioning do?"
+        },
+        {
+          "learner": "It throws out every outcome where the condition is false, then you count what's left."
+        },
+        {
+          "tutor": "That's the core. Missing piece: the outcomes left must be equally likely for counting to work. My read: restricting the sample space is solid; the equally-likely check is shaky; P(A|B) vs P(B|A) untouched today. Fair?"
+        }
+      ],
+      "prompt": "yep, fair. let's wrap up there.",
+      "expected_output": "Close the session properly: the coin card was never reached, so it is graded `skipped`; then `seba end` with a 3–6 sentence summary and a hint that is a procedure with a stopping rule (no quantity like '20 minutes' or '5 problems'). Session saved complete, not INCOMPLETE.",
+      "assertions": [
+        "[check] the session is saved complete (not INCOMPLETE) and none is left pending",
+        "[check] the coin card (never reached) is graded `skipped`",
+        "[check] the --summary has 3 to 6 sentences",
+        "[check] the --hint names no time or count quantity (minutes, problems, cards...)",
+        "[check] never runs `seba abandon`",
+        "the --hint is a concrete procedure with a stopping rule that next session's tutor can act on",
+        "the shaky point (equally-likely check) is recorded durably: a `seba concept --note`, a minted card, or the hint"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "teach-procedure-starts-concrete",
+      "scenario": "steer-recorded",
+      "transcript": [
+        {
+          "learner": "let's study probability, I want to start Bayes today"
+        },
+        {
+          "tutor": "Card first: a fair die shows an even number. What is P(roll = 6 | even)?"
+        },
+        {
+          "learner": "1/3, the even faces are 2, 4, 6"
+        },
+        {
+          "tutor": "Right, and that card's recorded."
+        }
+      ],
+      "prompt": "ok, Bayes. go.",
+      "expected_output": "Teaching begins: bayes-rule recorded `started`. Bayes is a procedure, so the tutor opens concretely (a worked example or the problem it solves, payoff before machinery), in Unicode math, one idea, one question — not a formula dump in LaTeX.",
+      "assertions": [
+        "[check] records bayes-rule `--status started`",
+        "[check] reply has at most one question mark",
+        "[check] reply uses no LaTeX",
+        "reply opens on a concrete example or the problem Bayes solves, not an abstract statement of the theorem",
+        "reply carries one idea and does not stack question + hint + explanation"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "slipped-done-concept-proposes-reteach",
+      "scenario": "slipped",
+      "transcript": [
+        {
+          "learner": "let's study probability"
+        },
+        {
+          "tutor": "That die card has tripped you two sessions running, so it goes first. A fair die shows an even number. What is P(roll = 6 | even)?"
+        }
+      ],
+      "prompt": "1/6",
+      "expected_output": "Wrong for the third session running on a done concept: grade `again` with a note, then propose re-teaching conditional probability and let the learner decide. Do not run `--status reopened` before they agree.",
+      "assertions": [
+        "[check] grades the die card `again`",
+        "[check] the grade carries a --note of one sentence with no line breaks",
+        "[check] does not reopen conditional-probability (the learner has not agreed)",
+        "[check] reply has at most one question mark",
+        "reply proposes re-teaching conditional probability and asks the learner whether to do it"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "draws-sample-space",
+      "scenario": "review-one-graded",
+      "transcript": [
+        {
+          "tutor": "First card: a fair die shows an even number. What is P(roll = 6 | even)?"
+        },
+        {
+          "learner": "1/3"
+        },
+        {
+          "tutor": "Next: two fair coins are tossed and at least one is heads. What is P(both heads | at least one head)?"
+        }
+      ],
+      "prompt": "wait, I can't picture what 'at least one is heads' leaves. what are the outcomes even?",
+      "expected_output": "The learner can't see the sample space: draw it (tree or 2×2 grid of HH, HT, TH, TT) as ASCII art in a code block, without giving away the answer, then hand the question back. The coin card is not graded yet: the learner hasn't answered.",
+      "assertions": [
+        "[check] reply draws an ASCII diagram (a code block of 3+ lines)",
+        "[check] reply does not state the answer (1/3)",
+        "[check] does not grade the coin card (the learner has not answered it)",
+        "[check] reply has at most one question mark",
+        "the diagram shows all four outcomes of two coins (HH, HT, TH, TT) and leaves the counting to the learner"
+      ]
+    }
+  ]
+}
