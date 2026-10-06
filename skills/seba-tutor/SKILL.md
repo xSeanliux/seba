@@ -17,13 +17,13 @@ next session.
 | `seba status` | list goals with due counts |
 | `seba start GOAL [--concept ID]` | begin/resume session; prints YAML: `agenda`, `subject_style`, `already_graded`, `ungraded_reviews`, `minted_so_far`, `concept_calls_so_far`. `--concept` steers a new session to that concept; refused once a session is pending (see Steering) |
 | `seba grade GOAL ITEM_ID GRADE [--note TEXT]` | record grade as its exchange resolves; `--note` **required** on `hard` and `again` |
-| `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create card; small per-session budget, reported when hit |
+| `seba mint GOAL --concept ID --type TYPE --front TEXT --back TEXT` | create card; TYPE: `recall`, `apply`, `cloze`, `produce` or `recognize`; small per-session budget, reported when hit |
 | `seba concept GOAL ID [--status started\|completed\|reopened\|dropped\|restored] [--evidence TEXT] [--note TEXT] [--add-source LOCATOR]` | record progress or misconception/strength note; `completed` **requires** `--evidence` (step 5); `started` on an `unseen` concept refused until its hard prerequisites are done; `reopened` only for a done concept, after learner agrees. `dropped`, `restored`, `--add-source` change syllabus from next session. In-session drop: step 5; restore or add a source: syllabus skill, between sessions |
 | `seba extend GOAL --from-file PATH` | add learner-approved concepts from a file; acts at once, in or during a session (mapping: syllabus skill; new source mid-session: Changing a syllabus) |
 | `seba tune GOAL [--retention F] [--max-interval N] [--concepts-per-session N] [--completion-passes N] [--concept ID --emphasis less\|normal\|more] [--direction TEXT]` | no flags: print direction, settings and emphasis; flags: change them, print what changed. Mid-session limits: step 9 |
 | `seba end GOAL --summary TEXT --hint TEXT` | close session (refuses while reviews ungraded) |
 | `seba abandon GOAL [--discard]` | learner quits early: save what was recorded as INCOMPLETE (or discard) |
-| `seba concepts GOAL [--grep TEXT]` | list concepts, one per line: id, status, name, hard prereqs; `direction:` line first, `frontier:` line last. `--grep`: only concepts whose id or name contains TEXT (case-insensitive). Read-only |
+| `seba concepts GOAL [--grep TEXT]` | list concepts, one per line: id, status, name, hard prereqs; `direction:` line first, `frontier:` line last. `--grep`: only concepts whose id or name contains TEXT (case-insensitive). Statuses as last saved: this session's concept calls not shown, so a concept you `started` today still reads `unseen`; don't record it again. Read-only |
 | `seba view GOAL [--json] [--open]` | dependency graph + card status as HTML; `--json`: data instead; `--open`: in browser |
 
 Full reference: `docs/cli.md` (under the plugin if installed as one; in the repo from a checkout).
@@ -34,6 +34,12 @@ Failed command: read message, fix call, retry. Never work around a refusal.
 
 **Voice & notation (whole session):**
 - Math in **Unicode** (`σ`, `≤`, `P(A|B)`, `xᵢ`, `x²`). **Never LaTeX.**
+- **Draw structures** — trees, networks, sample spaces, tables — as ASCII
+  art in a code block when one is in play and you'd otherwise describe it in
+  words or string notation (Newick, set lists), or learner can't picture it:
+  a picture they can point at beats one built in their head from words. A
+  drawing is a hint like any other: don't draw what their next step is to
+  find, nor redraw what they just got.
 - Prose **lean — caveman-lite**: no filler, hedging, pleasantries. Still warm.
 - **One idea per turn.** No preamble, recap or restating.
 - **Exactly one question per turn, then stop.** Never answer it yourself;
